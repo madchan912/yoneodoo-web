@@ -9,15 +9,33 @@ function App() {
   const [selectedVideo, setSelectedVideo] = useState(null)
   const [ingredientsModalRecipe, setIngredientsModalRecipe] = useState(null)
 
-  const dummyRecipes = [
-    { id: 1, title: "단짠 간장 계란장", mainIngredients: ["계란", "청양고추"], subIngredients: ["간장", "올리고당"], videoId: "7q0YMzjPnvo" },
-    { id: 2, title: "전설의 다이어트 치미창가", mainIngredients: ["닭가슴살", "양배추"], subIngredients: ["스리라차", "다진마늘"], videoId: "qgmdgz_M-xs" },
-    { id: 3, title: "스팸 감자 짜글이 (재료 폭탄)", mainIngredients: ["감자", "스팸", "대파", "양파", "청양고추", "돼지고기"], subIngredients: ["고추장", "고춧가루", "간장", "된장", "다진마늘", "설탕", "후추"], videoId: "kHMKAdS8Pf0" },
-    { id: 4, title: "닭가슴살 양배추 쌈", mainIngredients: ["닭가슴살", "양배추"], subIngredients: ["쌈장", "마늘"], videoId: "H_l_b2sKkEM" }
-  ]
-
+  // 🚀 컴포넌트가 마운트될 때 (화면이 처음 켜질 때) 1번만 실행됩니다!
   useEffect(() => {
-    setRecipes(dummyRecipes)
+    // 스프링 부트 백엔드 API에서 진짜 데이터를 가져옵니다.
+    axios.get('http://localhost:8080/api/v1/recipes')
+      .then(response => {
+        // 1. 상태가 SUCCESS 인 것만 필터링 (자막 없음, 실패 데이터는 화면에서 제외!)
+        const realRecipes = response.data
+          .filter(recipe => recipe.status === 'SUCCESS' && recipe.ingredients && recipe.ingredients.length > 0)
+          .map(recipe => {
+            // 2. DB의 JSON 객체 [{"name": "고추장", "amount": "0.5스푼"}] 구조에서 'name'만 추출해 리스트로 만듭니다.
+            const ingredientNames = recipe.ingredients.map(ing => ing.name)
+            
+            return {
+              id: recipe.id,
+              title: recipe.title,
+              videoId: recipe.videoId,
+              mainIngredients: ingredientNames, // 파이썬 AI가 주/부재료를 아직 안 나눴으므로 전부 주재료 칸에 표시!
+              subIngredients: [] 
+            }
+          })
+        
+        // 3. 예쁘게 다듬은 진짜 데이터를 리액트 state에 쏙 넣습니다.
+        setRecipes(realRecipes)
+      })
+      .catch(error => {
+        console.error("실제 레시피 데이터를 가져오는데 실패했습니다:", error)
+      })
   }, [])
 
   useEffect(() => {
@@ -36,20 +54,16 @@ function App() {
       })
   }, [searchTerm, selectedTags])
 
-  // 🚀 [핵심 수정됨] addTag 대신 toggleTag로 업그레이드! (있으면 빼고, 없으면 넣기)
   const toggleTag = (ingredientName) => {
     if (selectedTags.includes(ingredientName)) {
-      // 이미 선택된 재료면 필터에서 제거
       setSelectedTags(selectedTags.filter(tag => tag !== ingredientName))
     } else {
-      // 선택 안 된 재료면 필터에 추가
       setSelectedTags([...selectedTags, ingredientName])
     }
     setSearchTerm('')
     setSuggestions([])
   }
 
-  // 상단 검색바 태그의 'x' 버튼용
   const removeTag = (tagToRemove) => {
     setSelectedTags(selectedTags.filter(tag => tag !== tagToRemove))
   }
@@ -196,28 +210,30 @@ function App() {
                 </div>
               </div>
 
-              <div>
-                <div style={{ fontSize: '0.8rem', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>🧂 부재료 (양념/소스)</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {displaySub.map((ing, idx) => (
-                    <span 
-                      key={`sub-${idx}`} 
-                      onClick={() => toggleTag(ing)}
-                      style={{ 
-                        backgroundColor: selectedTags.includes(ing) ? '#10b981' : '#2d2d2d', 
-                        color: selectedTags.includes(ing) ? 'white' : '#888', 
-                        padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {ing}
-                    </span>
-                  ))}
-                  {sortedSub.length > DISPLAY_LIMIT && (
-                    <span style={{ color: '#888', fontSize: '0.8rem', alignSelf: 'center', marginLeft: '2px' }}>...</span>
-                  )}
+              {recipe.subIngredients && recipe.subIngredients.length > 0 && (
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: '#aaa', marginBottom: '6px', fontWeight: 'bold' }}>🧂 부재료 (양념/소스)</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {displaySub.map((ing, idx) => (
+                      <span 
+                        key={`sub-${idx}`} 
+                        onClick={() => toggleTag(ing)}
+                        style={{ 
+                          backgroundColor: selectedTags.includes(ing) ? '#10b981' : '#2d2d2d', 
+                          color: selectedTags.includes(ing) ? 'white' : '#888', 
+                          padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {ing}
+                      </span>
+                    ))}
+                    {sortedSub.length > DISPLAY_LIMIT && (
+                      <span style={{ color: '#888', fontSize: '0.8rem', alignSelf: 'center', marginLeft: '2px' }}>...</span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div style={{ flexGrow: 1 }}></div>
               
@@ -325,24 +341,26 @@ function App() {
               </div>
             </div>
 
-            <div>
-              <div style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '8px', fontWeight: 'bold' }}>🧂 부재료 (양념/소스)</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {getSortedIngredients(ingredientsModalRecipe.subIngredients).map((ing, idx) => (
-                  <span 
-                    key={`modal-sub-${idx}`} 
-                    onClick={() => toggleTag(ing)}
-                    style={{ 
-                      backgroundColor: selectedTags.includes(ing) ? '#10b981' : '#2d2d2d', 
-                      color: selectedTags.includes(ing) ? 'white' : '#888', 
-                      padding: '6px 14px', borderRadius: '8px', fontSize: '0.95rem', cursor: 'pointer'
-                    }}
-                  >
-                    {ing}
-                  </span>
-                ))}
+            {ingredientsModalRecipe.subIngredients && ingredientsModalRecipe.subIngredients.length > 0 && (
+              <div>
+                <div style={{ fontSize: '0.9rem', color: '#aaa', marginBottom: '8px', fontWeight: 'bold' }}>🧂 부재료 (양념/소스)</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {getSortedIngredients(ingredientsModalRecipe.subIngredients).map((ing, idx) => (
+                    <span 
+                      key={`modal-sub-${idx}`} 
+                      onClick={() => toggleTag(ing)}
+                      style={{ 
+                        backgroundColor: selectedTags.includes(ing) ? '#10b981' : '#2d2d2d', 
+                        color: selectedTags.includes(ing) ? 'white' : '#888', 
+                        padding: '6px 14px', borderRadius: '8px', fontSize: '0.95rem', cursor: 'pointer'
+                      }}
+                    >
+                      {ing}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
