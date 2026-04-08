@@ -5,32 +5,38 @@ function App() {
   const [recipes, setRecipes] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [suggestions, setSuggestions] = useState([]) 
-  const [selectedTags, setSelectedTags] = useState([])
   const [selectedVideo, setSelectedVideo] = useState(null)
   const [ingredientsModalRecipe, setIngredientsModalRecipe] = useState(null)
+  
+  // 🚀 핵심 1. 용량 보기/숨기기 토글 상태 (기본값: 안 보임)
+  const [showAmount, setShowAmount] = useState(false)
 
-  // 🚀 컴포넌트가 마운트될 때 (화면이 처음 켜질 때) 1번만 실행됩니다!
+  // 🚀 핵심 2. 내 냉장고 상태 (로컬 스토리지 연동)
+  const [selectedTags, setSelectedTags] = useState(() => {
+    const saved = localStorage.getItem('yoneodoo_fridge')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  // 내 냉장고(selectedTags)가 변경될 때마다 브라우저 저장소에 동기화합니다.
   useEffect(() => {
-    // 스프링 부트 백엔드 API에서 진짜 데이터를 가져옵니다.
+    localStorage.setItem('yoneodoo_fridge', JSON.stringify(selectedTags))
+  }, [selectedTags])
+
+  useEffect(() => {
     axios.get('http://localhost:8080/api/v1/recipes')
       .then(response => {
-        // 1. 상태가 SUCCESS 인 것만 필터링 (자막 없음, 실패 데이터는 화면에서 제외!)
         const realRecipes = response.data
           .filter(recipe => recipe.status === 'SUCCESS' && recipe.ingredients && recipe.ingredients.length > 0)
           .map(recipe => {
-            // 2. DB의 JSON 객체 [{"name": "고추장", "amount": "0.5스푼"}] 구조에서 'name'만 추출해 리스트로 만듭니다.
-            const ingredientNames = recipe.ingredients.map(ing => ing.name)
-            
             return {
               id: recipe.id,
               title: recipe.title,
               videoId: recipe.videoId,
-              mainIngredients: ingredientNames, // 파이썬 AI가 주/부재료를 아직 안 나눴으므로 전부 주재료 칸에 표시!
+              // 🚀 핵심 3. 이름만 뽑지 않고, name과 amount가 모두 있는 객체 배열을 그대로 저장!
+              mainIngredients: recipe.ingredients, 
               subIngredients: [] 
             }
           })
-        
-        // 3. 예쁘게 다듬은 진짜 데이터를 리액트 state에 쏙 넣습니다.
         setRecipes(realRecipes)
       })
       .catch(error => {
@@ -70,8 +76,9 @@ function App() {
 
   const filteredRecipes = recipes.filter(recipe => {
     if (selectedTags.length === 0) return true;
-    const allIngredients = [...recipe.mainIngredients, ...recipe.subIngredients];
-    return selectedTags.every(tag => allIngredients.includes(tag))
+    // 이제 mainIngredients가 객체 배열이므로 .map(ing => ing.name)으로 이름만 꺼내서 비교합니다.
+    const allIngredientNames = [...recipe.mainIngredients, ...recipe.subIngredients].map(ing => ing.name);
+    return selectedTags.every(tag => allIngredientNames.includes(tag))
   })
 
   useEffect(() => {
@@ -82,10 +89,11 @@ function App() {
     }
   }, [selectedVideo, ingredientsModalRecipe])
 
+  // 정렬 로직도 객체(ing)의 name 속성을 기준으로 판단하도록 수정
   const getSortedIngredients = (ingredientsList) => {
     return [...ingredientsList].sort((a, b) => {
-      const isASelected = selectedTags.includes(a);
-      const isBSelected = selectedTags.includes(b);
+      const isASelected = selectedTags.includes(a.name);
+      const isBSelected = selectedTags.includes(b.name);
       if (isASelected && !isBSelected) return -1;
       if (!isASelected && isBSelected) return 1;
       return 0; 
@@ -152,6 +160,25 @@ function App() {
         </div>
       </div>
       
+      {/* 🚀 글로벌 용량 토글 버튼 & 결과 카운트 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 style={{ color: '#fff', fontSize: '1.2rem', margin: 0 }}>
+          추천 레시피 ({filteredRecipes.length}개)
+        </h2>
+        <button 
+          onClick={() => setShowAmount(!showAmount)}
+          style={{
+            backgroundColor: showAmount ? '#2d2d2d' : '#3b82f6',
+            color: 'white', border: 'none', padding: '8px 16px', 
+            borderRadius: '8px', fontSize: '0.9rem', cursor: 'pointer',
+            fontWeight: 'bold', transition: '0.2s',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+          }}
+        >
+          {showAmount ? "⚖️ 용량 숨기기" : "⚖️ 용량 보기"}
+        </button>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
         {filteredRecipes.map(recipe => {
           
@@ -192,16 +219,22 @@ function App() {
                   {displayMain.map((ing, idx) => (
                     <span 
                       key={`main-${idx}`} 
-                      onClick={() => toggleTag(ing)}
+                      onClick={() => toggleTag(ing.name)}
                       style={{ 
-                        backgroundColor: selectedTags.includes(ing) ? '#3b82f6' : '#2d2d2d', 
-                        color: selectedTags.includes(ing) ? 'white' : '#e0e0e0', 
+                        backgroundColor: selectedTags.includes(ing.name) ? '#3b82f6' : '#2d2d2d', 
+                        color: selectedTags.includes(ing.name) ? 'white' : '#e0e0e0', 
                         padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', 
-                        fontWeight: selectedTags.includes(ing) ? 'bold' : 'normal',
+                        fontWeight: selectedTags.includes(ing.name) ? 'bold' : 'normal',
                         cursor: 'pointer' 
                       }}
                     >
-                      {ing}
+                      {/* 🚀 showAmount 상태에 따라 용량을 렌더링합니다 */}
+                      {ing.name} 
+                      {showAmount && ing.amount && (
+                        <span style={{ color: selectedTags.includes(ing.name) ? '#cbf4ff' : '#888', marginLeft: '4px', fontSize: '0.75rem' }}>
+                          ({ing.amount})
+                        </span>
+                      )}
                     </span>
                   ))}
                   {sortedMain.length > DISPLAY_LIMIT && (
@@ -217,15 +250,20 @@ function App() {
                     {displaySub.map((ing, idx) => (
                       <span 
                         key={`sub-${idx}`} 
-                        onClick={() => toggleTag(ing)}
+                        onClick={() => toggleTag(ing.name)}
                         style={{ 
-                          backgroundColor: selectedTags.includes(ing) ? '#10b981' : '#2d2d2d', 
-                          color: selectedTags.includes(ing) ? 'white' : '#888', 
+                          backgroundColor: selectedTags.includes(ing.name) ? '#10b981' : '#2d2d2d', 
+                          color: selectedTags.includes(ing.name) ? 'white' : '#888', 
                           padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem',
                           cursor: 'pointer'
                         }}
                       >
-                        {ing}
+                        {ing.name}
+                        {showAmount && ing.amount && (
+                          <span style={{ color: selectedTags.includes(ing.name) ? '#cbf4ff' : '#555', marginLeft: '4px', fontSize: '0.75rem' }}>
+                            ({ing.amount})
+                          </span>
+                        )}
                       </span>
                     ))}
                     {sortedSub.length > DISPLAY_LIMIT && (
@@ -327,15 +365,20 @@ function App() {
                 {getSortedIngredients(ingredientsModalRecipe.mainIngredients).map((ing, idx) => (
                   <span 
                     key={`modal-main-${idx}`} 
-                    onClick={() => toggleTag(ing)}
+                    onClick={() => toggleTag(ing.name)}
                     style={{ 
-                      backgroundColor: selectedTags.includes(ing) ? '#3b82f6' : '#2d2d2d', 
-                      color: selectedTags.includes(ing) ? 'white' : '#e0e0e0', 
+                      backgroundColor: selectedTags.includes(ing.name) ? '#3b82f6' : '#2d2d2d', 
+                      color: selectedTags.includes(ing.name) ? 'white' : '#e0e0e0', 
                       padding: '6px 14px', borderRadius: '8px', fontSize: '0.95rem', 
-                      fontWeight: selectedTags.includes(ing) ? 'bold' : 'normal', cursor: 'pointer' 
+                      fontWeight: selectedTags.includes(ing.name) ? 'bold' : 'normal', cursor: 'pointer' 
                     }}
                   >
-                    {ing}
+                    {ing.name}
+                    {showAmount && ing.amount && (
+                      <span style={{ color: selectedTags.includes(ing.name) ? '#cbf4ff' : '#888', marginLeft: '4px', fontSize: '0.85rem' }}>
+                        ({ing.amount})
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>
@@ -348,14 +391,19 @@ function App() {
                   {getSortedIngredients(ingredientsModalRecipe.subIngredients).map((ing, idx) => (
                     <span 
                       key={`modal-sub-${idx}`} 
-                      onClick={() => toggleTag(ing)}
+                      onClick={() => toggleTag(ing.name)}
                       style={{ 
-                        backgroundColor: selectedTags.includes(ing) ? '#10b981' : '#2d2d2d', 
-                        color: selectedTags.includes(ing) ? 'white' : '#888', 
+                        backgroundColor: selectedTags.includes(ing.name) ? '#10b981' : '#2d2d2d', 
+                        color: selectedTags.includes(ing.name) ? 'white' : '#888', 
                         padding: '6px 14px', borderRadius: '8px', fontSize: '0.95rem', cursor: 'pointer'
                       }}
                     >
-                      {ing}
+                      {ing.name}
+                      {showAmount && ing.amount && (
+                        <span style={{ color: selectedTags.includes(ing.name) ? '#cbf4ff' : '#555', marginLeft: '4px', fontSize: '0.85rem' }}>
+                          ({ing.amount})
+                        </span>
+                      )}
                     </span>
                   ))}
                 </div>
