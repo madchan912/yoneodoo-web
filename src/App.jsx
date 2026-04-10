@@ -31,14 +31,15 @@ function App() {
   }, [myFridge])
 
   useEffect(() => {
-    axios.get('http://localhost:8080/api/v1/recipes')
+    // 🚀 수정됨: Render 클라우드 서버 주소로 변경
+    axios.get('https://yoneodoo-api.onrender.com/api/v1/recipes')
       .then(response => {
         const realRecipes = response.data
           .filter(recipe => recipe.status === 'SUCCESS' && recipe.ingredients && recipe.ingredients.length > 0)
           .map(recipe => ({
             id: recipe.id,
             title: recipe.title,
-            youtuberName: recipe.youtuberName, // 🚀 백엔드에서 넘어온 유튜버 이름 매핑 추가!
+            youtuberName: recipe.youtuberName,
             videoId: recipe.videoId,
             mainIngredients: recipe.ingredients, 
             subIngredients: [] 
@@ -54,7 +55,8 @@ function App() {
       setSelectedIndex(-1)
       return
     }
-    axios.get(`http://localhost:8080/api/v1/ingredients/search?keyword=${searchTerm}`)
+    // 🚀 수정됨: Render 클라우드 서버 주소로 변경
+    axios.get(`https://yoneodoo-api.onrender.com/api/v1/ingredients/search?keyword=${searchTerm}`)
       .then(response => {
         const filtered = response.data.filter(item => !searchTags.includes(item.name))
         setSuggestions(filtered)
@@ -68,7 +70,8 @@ function App() {
       setFridgeSelectedIndex(-1)
       return
     }
-    axios.get(`http://localhost:8080/api/v1/ingredients/search?keyword=${fridgeSearchTerm}`)
+    // 🚀 수정됨: Render 클라우드 서버 주소로 변경
+    axios.get(`https://yoneodoo-api.onrender.com/api/v1/ingredients/search?keyword=${fridgeSearchTerm}`)
       .then(response => {
         const filtered = response.data.filter(item => !myFridge.includes(item.name))
         setFridgeSuggestions(filtered)
@@ -241,14 +244,12 @@ function App() {
           </div>
         </div>
 
-        {/* 🚀 추가된 부분: 유튜버 이름 (제목 바로 위, 눈에 띄는 빨간 톤으로 포인트) */}
         {recipe.youtuberName && (
           <div style={{ fontSize: '0.85rem', color: '#f87171', fontWeight: 'bold', marginBottom: '4px' }}>
             📺 {recipe.youtuberName}
           </div>
         )}
         
-        {/* 기존 레시피 제목 */}
         <h3 style={{ margin: '0 0 15px 0', color: '#ffffff', fontSize: '1.2rem', lineHeight: '1.3', wordBreak: 'keep-all' }}>{recipe.title}</h3>
         
         <div style={{ marginBottom: '12px' }}>
