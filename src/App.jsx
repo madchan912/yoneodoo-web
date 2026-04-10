@@ -7,6 +7,7 @@ function App() {
   const [ingredientsModalRecipe, setIngredientsModalRecipe] = useState(null)
   const [showAmount, setShowAmount] = useState(false)
 
+  // 1. 상태 분리: 필터(도마) vs 냉장고(창고)
   const [searchTerm, setSearchTerm] = useState('')
   const [suggestions, setSuggestions] = useState([]) 
   const [searchTags, setSearchTags] = useState([])
@@ -21,6 +22,10 @@ function App() {
   const [fridgeSuggestions, setFridgeSuggestions] = useState([])
   const [fridgeSelectedIndex, setFridgeSelectedIndex] = useState(-1) 
 
+  // 2. 요리 완료 팝업 상태 관리
+  const [finishedRecipe, setFinishedRecipe] = useState(null)
+  const [selectedToEmpty, setSelectedToEmpty] = useState([])
+
   useEffect(() => {
     localStorage.setItem('yoneodoo_real_fridge', JSON.stringify(myFridge))
   }, [myFridge])
@@ -33,6 +38,7 @@ function App() {
           .map(recipe => ({
             id: recipe.id,
             title: recipe.title,
+            youtuberName: recipe.youtuberName, // 🚀 백엔드에서 넘어온 유튜버 이름 매핑 추가!
             videoId: recipe.videoId,
             mainIngredients: recipe.ingredients, 
             subIngredients: [] 
@@ -132,13 +138,35 @@ function App() {
     }
   }
 
+  const openFinishedModal = (recipe) => {
+    setFinishedRecipe(recipe)
+    setSelectedToEmpty([]) 
+  }
+
+  const toggleEmptyItem = (ingName) => {
+    if (selectedToEmpty.includes(ingName)) {
+      setSelectedToEmpty(selectedToEmpty.filter(i => i !== ingName))
+    } else {
+      setSelectedToEmpty([...selectedToEmpty, ingName])
+    }
+  }
+
+  const confirmEmptyFridge = () => {
+    if (selectedToEmpty.length > 0) {
+      const newFridge = myFridge.filter(item => !selectedToEmpty.includes(item))
+      setMyFridge(newFridge)
+    }
+    setFinishedRecipe(null)
+    setSelectedToEmpty([])
+  }
+
   useEffect(() => {
-    if (selectedVideo || ingredientsModalRecipe || isFridgeOpen) {
+    if (selectedVideo || ingredientsModalRecipe || isFridgeOpen || finishedRecipe) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'unset'
     }
-  }, [selectedVideo, ingredientsModalRecipe, isFridgeOpen])
+  }, [selectedVideo, ingredientsModalRecipe, isFridgeOpen, finishedRecipe])
 
   const getSortedIngredients = (ingredientsList, compareArray) => {
     return [...ingredientsList].sort((a, b) => {
@@ -204,7 +232,6 @@ function App() {
         <div onClick={() => setSelectedVideo(recipe.videoId)} style={{ width: '100%', height: '160px', marginBottom: '15px', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#000', cursor: 'pointer', position: 'relative' }}>
           <img src={`https://img.youtube.com/vi/${recipe.videoId}/maxresdefault.jpg`} onError={(e) => { e.target.src = `https://img.youtube.com/vi/${recipe.videoId}/hqdefault.jpg`; }} alt="thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
           
-          {/* 🚀 유튜브 스타일의 빨간 재생 버튼으로 변경! */}
           <div style={{ 
             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', 
             width: '60px', height: '40px', backgroundColor: '#ff0000', borderRadius: '12px', 
@@ -214,6 +241,14 @@ function App() {
           </div>
         </div>
 
+        {/* 🚀 추가된 부분: 유튜버 이름 (제목 바로 위, 눈에 띄는 빨간 톤으로 포인트) */}
+        {recipe.youtuberName && (
+          <div style={{ fontSize: '0.85rem', color: '#f87171', fontWeight: 'bold', marginBottom: '4px' }}>
+            📺 {recipe.youtuberName}
+          </div>
+        )}
+        
+        {/* 기존 레시피 제목 */}
         <h3 style={{ margin: '0 0 15px 0', color: '#ffffff', fontSize: '1.2rem', lineHeight: '1.3', wordBreak: 'keep-all' }}>{recipe.title}</h3>
         
         <div style={{ marginBottom: '12px' }}>
@@ -221,6 +256,7 @@ function App() {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {displayMain.map((ing, idx) => {
               const isHighlighted = highlightArray.includes(ing.name);
+
               return (
                 <span 
                   key={`main-${idx}`} 
@@ -231,7 +267,8 @@ function App() {
                     border: `1px solid ${isHighlighted ? cardColor : '#444'}`
                   }}
                 >
-                  {ing.name} {showAmount && ing.amount && <span style={{ color: isHighlighted ? '#e0f2fe' : '#888', marginLeft: '4px', fontSize: '0.75rem' }}>({ing.amount})</span>}
+                  {ing.name} 
+                  {showAmount && ing.amount && <span style={{ color: isHighlighted ? '#e0f2fe' : '#888', marginLeft: '4px', fontSize: '0.75rem' }}>({ing.amount})</span>}
                 </span>
               )
             })}
@@ -239,11 +276,23 @@ function App() {
         </div>
 
         <div style={{ flexGrow: 1 }}></div>
-        {needsExpandButton && (
-          <button onClick={() => setIngredientsModalRecipe(recipe)} style={{ width: '100%', marginTop: '15px', padding: '8px', backgroundColor: '#2d2d2d', border: 'none', color: '#ddd', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>
-            모든 재료 보기 +
+        
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px', width: '100%' }}>
+          {needsExpandButton && (
+            <button onClick={() => setIngredientsModalRecipe(recipe)} style={{ flex: 1, padding: '10px 0', backgroundColor: '#2d2d2d', border: 'none', color: '#ddd', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}>
+              재료 더보기 +
+            </button>
+          )}
+          <button 
+            onClick={() => openFinishedModal(recipe)} 
+            style={{ 
+              flex: needsExpandButton ? 1 : '1 1 100%', padding: '10px 0', backgroundColor: '#10b981', 
+              border: 'none', color: 'white', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold',
+              boxShadow: '0 4px 10px rgba(16, 185, 129, 0.3)'
+            }}>
+            🍳 요리 완료!
           </button>
-        )}
+        </div>
       </div>
     )
   }
@@ -401,6 +450,7 @@ function App() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {[...ingredientsModalRecipe.mainIngredients, ...(ingredientsModalRecipe.subIngredients || [])].map((ing, idx) => {
                 const isHighlighted = searchTags.includes(ing.name);
+
                 return (
                   <span 
                     key={`modal-ing-${idx}`} 
@@ -420,6 +470,64 @@ function App() {
           </div>
         </div>
       )}
+
+      {finishedRecipe && (
+        <div onClick={() => setFinishedRecipe(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#1e1e1e', padding: '30px', borderRadius: '20px', width: '90%', maxWidth: '400px', border: '1px solid #444', position: 'relative', textAlign: 'center' }}>
+            <h2 style={{ color: '#10b981', margin: '0 0 10px 0', fontSize: '1.6rem' }}>🎉 요리 완료!</h2>
+            <p style={{ color: '#ccc', fontSize: '0.95rem', marginBottom: '25px', lineHeight: '1.5' }}>
+              맛있게 드셨나요?<br/>냉장고에서 <b>완전히 다 써버린 재료</b>가 있다면<br/>선택해서 비워주세요!
+            </p>
+
+            {(() => {
+              const recipeIngNames = [...finishedRecipe.mainIngredients, ...(finishedRecipe.subIngredients || [])].map(ing => ing.name)
+              const fridgeOverlap = myFridge.filter(item => recipeIngNames.includes(item))
+
+              if (fridgeOverlap.length > 0) {
+                return (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#121212', padding: '15px', borderRadius: '12px', border: '1px inset #333', maxHeight: '200px', overflowY: 'auto', marginBottom: '20px', textAlign: 'left' }}>
+                      {fridgeOverlap.map(ing => (
+                        <label key={ing} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#fff', fontSize: '1rem', cursor: 'pointer', padding: '5px 0' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={selectedToEmpty.includes(ing)}
+                            onChange={() => toggleEmptyItem(ing)}
+                            style={{ width: '18px', height: '18px', accentColor: '#10b981', cursor: 'pointer' }}
+                          />
+                          {ing}
+                        </label>
+                      ))}
+                    </div>
+                    
+                    <button 
+                      onClick={confirmEmptyFridge}
+                      style={{ width: '100%', padding: '12px', backgroundColor: selectedToEmpty.length > 0 ? '#10b981' : '#3b82f6', border: 'none', color: 'white', borderRadius: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', transition: 'background-color 0.3s' }}
+                    >
+                      {selectedToEmpty.length > 0 ? `선택한 ${selectedToEmpty.length}개 재료 비우기` : '다 쓴 재료 없어요 (닫기)'}
+                    </button>
+                  </>
+                )
+              } else {
+                return (
+                  <>
+                    <div style={{ padding: '20px', backgroundColor: '#121212', borderRadius: '12px', color: '#888', marginBottom: '20px', fontSize: '0.9rem' }}>
+                      이 레시피에 쓰인 재료 중<br/>현재 냉장고에 등록된 재료가 없습니다.
+                    </div>
+                    <button 
+                      onClick={() => setFinishedRecipe(null)}
+                      style={{ width: '100%', padding: '12px', backgroundColor: '#3b82f6', border: 'none', color: 'white', borderRadius: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}
+                    >
+                      확인 (닫기)
+                    </button>
+                  </>
+                )
+              }
+            })()}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
