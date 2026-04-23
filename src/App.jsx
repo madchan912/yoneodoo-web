@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { getApiBaseUrl } from './config/apiBase'
 
 function App() {
   const [recipes, setRecipes] = useState([])
@@ -31,8 +32,8 @@ function App() {
   }, [myFridge])
 
   useEffect(() => {
-    // 🚀 수정됨: Render 클라우드 서버 주소로 변경
-    axios.get('https://yoneodoo-api.onrender.com/api/v1/recipes')
+    const base = getApiBaseUrl()
+    axios.get(`${base}/api/v1/recipes`)
       .then(response => {
         const realRecipes = response.data
           .filter(recipe => recipe.status === 'SUCCESS' && recipe.ingredients && recipe.ingredients.length > 0)
@@ -55,8 +56,8 @@ function App() {
       setSelectedIndex(-1)
       return
     }
-    // 🚀 수정됨: Render 클라우드 서버 주소로 변경
-    axios.get(`https://yoneodoo-api.onrender.com/api/v1/ingredients/search?keyword=${searchTerm}`)
+    const base = getApiBaseUrl()
+    axios.get(`${base}/api/v1/ingredients/search?keyword=${encodeURIComponent(searchTerm)}`)
       .then(response => {
         const filtered = response.data.filter(item => !searchTags.includes(item.name))
         setSuggestions(filtered)
@@ -70,8 +71,8 @@ function App() {
       setFridgeSelectedIndex(-1)
       return
     }
-    // 🚀 수정됨: Render 클라우드 서버 주소로 변경
-    axios.get(`https://yoneodoo-api.onrender.com/api/v1/ingredients/search?keyword=${fridgeSearchTerm}`)
+    const base = getApiBaseUrl()
+    axios.get(`${base}/api/v1/ingredients/search?keyword=${encodeURIComponent(fridgeSearchTerm)}`)
       .then(response => {
         const filtered = response.data.filter(item => !myFridge.includes(item.name))
         setFridgeSuggestions(filtered)
