@@ -3,7 +3,7 @@ import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-rou
 import { adminClient } from '../api/adminClient'
 import AdminLoginPage from './AdminLoginPage'
 import RecipeManagePage from './RecipeManagePage'
-import IngredientNormalizePage from './IngredientNormalizePage'
+import IngredientMappingPage from './IngredientMappingPage'
 import TaskBoardPage from './TaskBoardPage'
 import { clearAdminSecret, getAdminSecret } from './adminSession'
 
@@ -119,7 +119,7 @@ export default function AdminRoutes() {
       <Route element={<AdminRequiredOutlet />}>
         <Route element={<AdminShell />}>
           <Route path="recipes" element={<RecipeManagePage />} />
-          <Route path="ingredients" element={<IngredientNormalizePage />} />
+          <Route path="ingredients" element={<IngredientMappingPage />} />
           <Route path="tasks" element={<TaskBoardPage />} />
         </Route>
       </Route>

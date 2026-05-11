@@ -14,11 +14,30 @@ export default function IngredientNormalizePage() {
   const [success, setSuccess] = useState('')
   const [suggesting, setSuggesting] = useState(false)
   const [suggestionInfo, setSuggestionInfo] = useState('')
+  /** 전체 미분류 AI 그룹핑 승인 모달 */
+  const [bulkAnalyzing, setBulkAnalyzing] = useState(false)
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
+  /** @type {Record<string, string[]> | null} */
+  const [bulkGroups, setBulkGroups] = useState(null)
+  /** @type {Record<string, boolean>} key = `${master}|||${raw}` */
+  const [bulkChecked, setBulkChecked] = useState({})
+  const [bulkSaving, setBulkSaving] = useState(false)
   /** @type {[Set<string>, function]} 미분류에서 선택된 rawName 집합 (기존 selected와 동일 역할) */
   const [selected, setSelected] = useState(() => new Set())
   const [masterName, setMasterName] = useState('')
 
   const selectedIngredients = useMemo(() => Array.from(selected), [selected])
+
+  useEffect(() => {
+    if (!bulkModalOpen || !bulkGroups) return
+    const next = {}
+    Object.entries(bulkGroups).forEach(([master, raws]) => {
+      ;(raws || []).forEach((raw) => {
+        next[`${master}|||${raw}`] = true
+      })
+    })
+    setBulkChecked(next)
+  }, [bulkModalOpen, bulkGroups])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -128,6 +147,75 @@ export default function IngredientNormalizePage() {
     }
   }
 
+  const bulkCheckKey = (master, raw) => `${master}|||${raw}`
+
+  const handleBulkAnalyze = async () => {
+    setError('')
+    setSuccess('')
+    setBulkAnalyzing(true)
+    try {
+      const res = await adminClient.post('/api/v1/admin/ingredients/bulk-suggest')
+      const data = res.data
+      if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+        setError('그룹 결과 형식이 올바르지 않습니다.')
+        return
+      }
+      const keys = Object.keys(data)
+      if (keys.length === 0) {
+        setSuccess('미분류 재료가 없거나 AI 가 빈 그룹을 반환했습니다.')
+        return
+      }
+      setBulkGroups(data)
+      setBulkModalOpen(true)
+    } catch (e) {
+      const status = e.response?.status
+      let msg
+      if (status === 503) msg = 'Gemini API 키가 서버에 설정되어 있지 않습니다.'
+      else if (status === 504) msg = 'Gemini 호출이 시간 초과되었습니다. 재료가 많으면 나중에 다시 시도해 주세요.'
+      else if (status === 502) msg = e.response?.data?.message || 'Gemini 응답을 해석하지 못했습니다.'
+      else msg = e.response?.data?.message || e.response?.statusText || e.message || '일괄 그룹핑 분석에 실패했습니다.'
+      setError(typeof msg === 'string' ? msg : '일괄 그룹핑 분석에 실패했습니다.')
+    } finally {
+      setBulkAnalyzing(false)
+    }
+  }
+
+  const toggleBulkItem = (master, raw) => {
+    const k = bulkCheckKey(master, raw)
+    setBulkChecked((prev) => ({ ...prev, [k]: !prev[k] }))
+  }
+
+  const handleBulkApproveSave = async () => {
+    if (!bulkGroups) return
+    const items = []
+    Object.entries(bulkGroups).forEach(([master, raws]) => {
+      ;(raws || []).forEach((raw) => {
+        const k = bulkCheckKey(master, raw)
+        if (bulkChecked[k]) items.push({ rawName: raw, masterName: master })
+      })
+    })
+    if (items.length === 0) {
+      setError('저장할 항목이 없습니다. 최소 한 건 이상 체크되어 있어야 합니다.')
+      return
+    }
+    setError('')
+    setSuccess('')
+    setBulkSaving(true)
+    try {
+      const res = await adminClient.post('/api/v1/admin/ingredients/bulk-map', { items })
+      const n = res.data?.updated ?? items.length
+      setSuccess(`일괄 승인 저장 완료 (${n}건). 목록을 새로고침합니다.`)
+      setBulkModalOpen(false)
+      setBulkGroups(null)
+      await load()
+    } catch (e) {
+      const msg = e.response?.data?.message || e.response?.statusText || e.message
+      setError(typeof msg === 'string' ? msg : '일괄 저장에 실패했습니다.')
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   const handleUnmap = async (rawName) => {
     setError('')
     setSuccess('')
@@ -175,6 +263,29 @@ export default function IngredientNormalizePage() {
         <strong style={{ color: '#d4d4d4' }}>매핑 완료 목록</strong>에서 개별 매핑을 해제할 수 있습니다. (이름은 서버에서 공백
         제거 규칙으로 정규화됩니다.)
       </p>
+
+      <div style={{ marginBottom: 18, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={handleBulkAnalyze}
+          disabled={bulkAnalyzing || loading}
+          style={{
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: '1px solid #f97316',
+            background: bulkAnalyzing || loading ? '#2a2a2a' : '#431407',
+            color: bulkAnalyzing || loading ? '#737373' : '#ffedd5',
+            fontWeight: 800,
+            cursor: bulkAnalyzing || loading ? 'not-allowed' : 'pointer',
+            fontSize: '0.9rem',
+          }}
+        >
+          {bulkAnalyzing ? '분석 중…' : '🚀 전체 미분류 AI 그룹핑 분석'}
+        </button>
+        <span style={{ fontSize: '0.8rem', color: '#737373', maxWidth: 520, lineHeight: 1.45 }}>
+          미분류 재료 전체를 Gemini 에게 보내 마스터별 그룹을 받습니다. 결과는 승인 모달에서 검토한 뒤 일괄 저장됩니다 (자동 DB 저장 없음).
+        </span>
+      </div>
 
       {error && (
         <div style={{ color: '#f87171', marginBottom: 12, padding: 12, background: '#2a1515', borderRadius: 8 }}>{error}</div>
@@ -452,6 +563,178 @@ export default function IngredientNormalizePage() {
           }
         `}
       </style>
+
+      {bulkModalOpen && bulkGroups && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bulk-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.82)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => !bulkSaving && setBulkModalOpen(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 920,
+              maxHeight: 'min(88vh, 960px)',
+              background: '#141414',
+              border: '1px solid #3f3f46',
+              borderRadius: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #2a2a2a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <div id="bulk-modal-title" style={{ fontWeight: 900, color: '#fff', fontSize: '1.05rem' }}>
+                  AI 그룹핑 결과 — 승인 후 저장
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#a1a1aa', marginTop: 4 }}>
+                  각 마스터 아래 원본은 기본 체크됨. 잘못 묶인 항목만 체크 해제한 뒤 [일괄 승인 및 저장]을 누르세요.
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={bulkSaving}
+                onClick={() => setBulkModalOpen(false)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #444',
+                  background: '#1f1f1f',
+                  color: '#e5e5e5',
+                  cursor: bulkSaving ? 'not-allowed' : 'pointer',
+                  fontSize: '0.85rem',
+                }}
+              >
+                닫기
+              </button>
+            </div>
+
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 20px' }}>
+              {Object.entries(bulkGroups).map(([master, raws]) => (
+                <section key={master} style={{ marginBottom: 22 }}>
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      color: '#fdba74',
+                      marginBottom: 10,
+                      fontSize: '0.95rem',
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    [ {master} ]
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                    {(raws || []).map((raw) => {
+                      const k = bulkCheckKey(master, raw)
+                      const checked = bulkChecked[k] !== false
+                      return (
+                        <label
+                          key={k}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '8px 12px',
+                            borderRadius: 10,
+                            border: '1px solid ' + (checked ? '#3f3f46' : '#525252'),
+                            background: checked ? '#1c1917' : '#0c0a09',
+                            color: checked ? '#f5f5f4' : '#78716c',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleBulkItem(master, raw)}
+                            style={{
+                              width: 16,
+                              height: 16,
+                              accentColor: '#f97316',
+                              cursor: 'pointer',
+                            }}
+                          />
+                          <span style={{ wordBreak: 'break-all' }}>{raw}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #2a2a2a',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 10,
+                flexShrink: 0,
+                background: '#111',
+              }}
+            >
+              <button
+                type="button"
+                disabled={bulkSaving}
+                onClick={() => setBulkModalOpen(false)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  border: '1px solid #444',
+                  background: '#1e1e1e',
+                  color: '#e5e5e5',
+                  cursor: bulkSaving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={bulkSaving}
+                onClick={handleBulkApproveSave}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: bulkSaving ? '#444' : '#ea580c',
+                  color: '#fff',
+                  fontWeight: 800,
+                  cursor: bulkSaving ? 'not-allowed' : 'pointer',
+                  boxShadow: bulkSaving ? 'none' : '0 8px 24px rgba(234,88,12,0.35)',
+                }}
+              >
+                {bulkSaving ? '저장 중…' : '일괄 승인 및 저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
