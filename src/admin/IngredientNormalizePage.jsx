@@ -182,7 +182,10 @@ export default function IngredientNormalizePage() {
 
   const toggleBulkItem = (master, raw) => {
     const k = bulkCheckKey(master, raw)
-    setBulkChecked((prev) => ({ ...prev, [k]: !prev[k] }))
+    setBulkChecked((prev) => {
+      const wasChecked = prev[k] !== false
+      return { ...prev, [k]: !wasChecked }
+    })
   }
 
   const handleBulkApproveSave = async () => {
@@ -191,7 +194,7 @@ export default function IngredientNormalizePage() {
     Object.entries(bulkGroups).forEach(([master, raws]) => {
       ;(raws || []).forEach((raw) => {
         const k = bulkCheckKey(master, raw)
-        if (bulkChecked[k]) items.push({ rawName: raw, masterName: master })
+        if (bulkChecked[k] !== false) items.push({ rawName: raw, masterName: master })
       })
     })
     if (items.length === 0) {
