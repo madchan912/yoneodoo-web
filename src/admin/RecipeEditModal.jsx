@@ -88,6 +88,8 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [ingredients, setIngredients] = useState([])
   const [displayStatus, setDisplayStatus] = useState('ACTIVE')
+  const [status, setStatus] = useState('')
+  const [originalStatus, setOriginalStatus] = useState('')
   const [copyState, setCopyState] = useState('idle') // 'idle' | 'copied' | 'error'
 
   const load = useCallback(async () => {
@@ -102,6 +104,9 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
       setYoutubeUrl(d.youtubeUrl ?? '')
       setIngredients(Array.isArray(d.ingredients) ? d.ingredients.map((it) => ({ name: it?.name ?? '', amount: it?.amount ?? '' })) : [])
       setDisplayStatus(d.displayStatus === 'HIDDEN' ? 'HIDDEN' : 'ACTIVE')
+      const initialStatus = d.status ?? ''
+      setStatus(initialStatus)
+      setOriginalStatus(initialStatus)
     } catch (e) {
       setError('레시피 정보를 불러오지 못했습니다.')
     } finally {
@@ -172,6 +177,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
         youtubeUrl: youtubeUrl.trim(),
         ingredients: cleaned,
         displayStatus,
+        status: status === '' ? null : status,
       })
       if (typeof onSaved === 'function') onSaved(res.data)
       onClose?.()
@@ -253,6 +259,81 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
                     HIDDEN 으로 저장하면 사용자 검색·목록에서 즉시 제외됩니다 (Soft Delete).
                   </span>
                 </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>
+                  크롤러 파이프라인 상태 (status){' '}
+                  {originalStatus && (
+                    <span
+                      style={{
+                        marginLeft: 6,
+                        display: 'inline-block',
+                        padding: '1px 7px',
+                        borderRadius: 999,
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        background:
+                          originalStatus === 'SUCCESS' ? '#064e3b' : originalStatus === 'NO_SUBTITLES' ? '#3f1212' : '#1f1f1f',
+                        color:
+                          originalStatus === 'SUCCESS' ? '#a7f3d0' : originalStatus === 'NO_SUBTITLES' ? '#fecaca' : '#a1a1aa',
+                        border:
+                          '1px solid ' +
+                          (originalStatus === 'SUCCESS'
+                            ? '#065f46'
+                            : originalStatus === 'NO_SUBTITLES'
+                            ? '#7f1d1d'
+                            : '#3f3f46'),
+                      }}
+                    >
+                      현재: {originalStatus}
+                    </span>
+                  )}
+                </label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <select
+                    value={status ?? ''}
+                    onChange={(e) => setStatus(e.target.value)}
+                    style={{
+                      ...inputStyle,
+                      flex: '0 0 auto',
+                      minWidth: 220,
+                      width: 'auto',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">(변경 없음 — 기존 값 유지)</option>
+                    <option value="SUCCESS">SUCCESS — 정상 처리, 사용자 노출 허용</option>
+                    <option value="NO_SUBTITLES">NO_SUBTITLES — 자막 없음(사용자 비노출)</option>
+                    <option value="PENDING">PENDING — 처리 대기</option>
+                    <option value="FAILED">FAILED — 처리 실패</option>
+                  </select>
+                  {originalStatus !== 'SUCCESS' && (
+                    <button
+                      type="button"
+                      onClick={() => setStatus('SUCCESS')}
+                      title="수동 보강을 마쳤다면 한 번에 SUCCESS 로 승급"
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: '1px solid #10b981',
+                        background: status === 'SUCCESS' ? '#064e3b' : '#0f1f1a',
+                        color: '#a7f3d0',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      ✓ SUCCESS 로 승급
+                    </button>
+                  )}
+                </div>
+                {status && status !== originalStatus && (
+                  <div style={{ marginTop: 6, fontSize: '0.75rem', color: '#fcd34d' }}>
+                    저장 시 status 가 <strong>{originalStatus || '(없음)'}</strong> → <strong>{status}</strong> 로 변경됩니다.
+                    SUCCESS + ACTIVE 가 모두 만족되면 사용자 화면에 즉시 노출됩니다.
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: 14 }}>

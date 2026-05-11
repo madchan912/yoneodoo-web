@@ -12,6 +12,8 @@ export default function IngredientNormalizePage() {
   const [unmapping, setUnmapping] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestionInfo, setSuggestionInfo] = useState('')
   /** @type {[Set<string>, function]} 미분류에서 선택된 rawName 집합 (기존 selected와 동일 역할) */
   const [selected, setSelected] = useState(() => new Set())
   const [masterName, setMasterName] = useState('')
@@ -91,6 +93,41 @@ export default function IngredientNormalizePage() {
     }
   }
 
+  const handleSuggest = async () => {
+    setError('')
+    setSuccess('')
+    setSuggestionInfo('')
+    if (selected.size === 0) {
+      setError('AI 추천을 받을 원본 재료를 하나 이상 선택하세요.')
+      return
+    }
+    setSuggesting(true)
+    try {
+      const res = await adminClient.post('/api/v1/admin/ingredients/suggest', {
+        rawNames: selectedIngredients,
+      })
+      const suggestion = (res.data?.suggestion || '').trim()
+      if (!suggestion) {
+        setError('AI 가 추천값을 만들지 못했습니다. 다시 시도하거나 직접 입력해 주세요.')
+        return
+      }
+      setMasterName(suggestion)
+      setSuggestionInfo(
+        `✨ AI 추천: "${suggestion}" (${res.data?.model || 'gemini'}). 확인 후 [매핑 저장] 을 눌러주세요.`,
+      )
+    } catch (e) {
+      const status = e.response?.status
+      let msg
+      if (status === 503) msg = 'Gemini API 키가 서버에 설정되어 있지 않습니다. (application-local.yaml 또는 GEMINI_API_KEY 확인)'
+      else if (status === 504) msg = 'Gemini 호출이 시간 초과되었습니다. 잠시 후 다시 시도해 주세요.'
+      else if (status === 502) msg = 'Gemini 응답을 해석하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      else msg = e.response?.data?.message || e.response?.statusText || e.message || 'AI 추천에 실패했습니다.'
+      setError(typeof msg === 'string' ? msg : 'AI 추천에 실패했습니다.')
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
   const handleUnmap = async (rawName) => {
     setError('')
     setSuccess('')
@@ -157,9 +194,28 @@ export default function IngredientNormalizePage() {
       >
         {/* 1) 미분류 목록만 스크롤 */}
         <section style={panelShell} aria-label="미분류 목록">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontWeight: 'bold', color: '#e5e5e5' }}>미분류 목록</span>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={handleSuggest}
+                disabled={suggesting || selected.size === 0}
+                title={selected.size === 0 ? '재료를 먼저 선택하세요' : 'Gemini 로 마스터명 추천'}
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: '1px solid ' + (suggesting ? '#444' : '#a855f7'),
+                  background: suggesting ? '#1a1a1a' : selected.size === 0 ? '#1a1428' : '#2a1a3f',
+                  color: suggesting || selected.size === 0 ? '#7c6f99' : '#e9d5ff',
+                  cursor: suggesting || selected.size === 0 ? 'not-allowed' : 'pointer',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {suggesting ? '추천 중…' : '✨ AI 매핑 추천'}
+              </button>
               <button
                 type="button"
                 onClick={selectAll}
@@ -279,7 +335,7 @@ export default function IngredientNormalizePage() {
             type="text"
             value={masterName}
             onChange={(e) => setMasterName(e.target.value)}
-            placeholder="예: 스팸"
+            placeholder="예: 스팸 (또는 [✨ AI 매핑 추천] 버튼으로 자동 입력)"
             style={{
               width: '100%',
               boxSizing: 'border-box',
@@ -288,9 +344,25 @@ export default function IngredientNormalizePage() {
               border: '1px solid #444',
               backgroundColor: '#121212',
               color: '#fff',
-              marginBottom: 12,
+              marginBottom: suggestionInfo ? 6 : 12,
             }}
           />
+          {suggestionInfo && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: '8px 10px',
+                background: '#2a1a3f',
+                border: '1px solid #6b21a8',
+                borderRadius: 8,
+                color: '#e9d5ff',
+                fontSize: '0.75rem',
+                lineHeight: 1.5,
+              }}
+            >
+              {suggestionInfo}
+            </div>
+          )}
           <button
             type="button"
             disabled={saving || loading}
