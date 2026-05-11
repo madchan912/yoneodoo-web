@@ -88,6 +88,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [ingredients, setIngredients] = useState([])
   const [displayStatus, setDisplayStatus] = useState('ACTIVE')
+  const [copyState, setCopyState] = useState('idle') // 'idle' | 'copied' | 'error'
 
   const load = useCallback(async () => {
     if (recipeId == null) return
@@ -122,6 +123,37 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
 
   const addIng = () => {
     setIngredients((prev) => [...prev, { name: '', amount: '' }])
+  }
+
+  const handleOpenYoutube = () => {
+    const url = (youtubeUrl || '').trim()
+    if (!url) return
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleCopyYoutube = async () => {
+    const url = (youtubeUrl || '').trim()
+    if (!url) return
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = url
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.focus()
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 1500)
+    } catch {
+      setCopyState('error')
+      setTimeout(() => setCopyState('idle'), 1800)
+    }
   }
 
   const handleSave = async () => {
@@ -225,20 +257,90 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
 
               <div style={{ marginBottom: 14 }}>
                 <label style={labelStyle}>유튜브 링크 (youtubeUrl) — 읽기 전용</label>
-                <input
-                  type="text"
-                  readOnly
-                  style={{
-                    ...inputStyle,
-                    background: '#0a0a0a',
-                    color: '#9ca3af',
-                    cursor: 'not-allowed',
-                    borderColor: '#2a2a2a',
-                  }}
-                  value={youtubeUrl}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  title="유튜브 링크는 원본 데이터 보존을 위해 수정할 수 없습니다."
-                />
+                <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    style={{
+                      ...inputStyle,
+                      flex: 1,
+                      minWidth: 0,
+                      background: '#0a0a0a',
+                      color: '#9ca3af',
+                      cursor: 'not-allowed',
+                      borderColor: '#2a2a2a',
+                    }}
+                    value={youtubeUrl}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    title="유튜브 링크는 원본 데이터 보존을 위해 수정할 수 없습니다."
+                  />
+                  <button
+                    type="button"
+                    onClick={handleOpenYoutube}
+                    disabled={!youtubeUrl}
+                    title="새 탭에서 유튜브 영상 열기"
+                    style={{
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: '1px solid #3f3f46',
+                      background: youtubeUrl ? '#1e1e1e' : '#141414',
+                      color: youtubeUrl ? '#e5e5e5' : '#555',
+                      cursor: youtubeUrl ? 'pointer' : 'not-allowed',
+                      fontSize: '0.85rem',
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span aria-hidden>🔗</span> 새창
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyYoutube}
+                    disabled={!youtubeUrl}
+                    title="유튜브 링크 클립보드에 복사"
+                    style={{
+                      padding: '0 12px',
+                      borderRadius: 8,
+                      border: '1px solid ' + (copyState === 'copied' ? '#10b981' : copyState === 'error' ? '#dc2626' : '#3f3f46'),
+                      background:
+                        copyState === 'copied'
+                          ? '#064e3b'
+                          : copyState === 'error'
+                          ? '#3f1212'
+                          : youtubeUrl
+                          ? '#1e1e1e'
+                          : '#141414',
+                      color:
+                        copyState === 'copied'
+                          ? '#a7f3d0'
+                          : copyState === 'error'
+                          ? '#fecaca'
+                          : youtubeUrl
+                          ? '#e5e5e5'
+                          : '#555',
+                      cursor: youtubeUrl ? 'pointer' : 'not-allowed',
+                      fontSize: '0.85rem',
+                      whiteSpace: 'nowrap',
+                      fontWeight: copyState === 'copied' ? 700 : 400,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+                    }}
+                  >
+                    {copyState === 'copied' ? (
+                      <>✓ 복사됨</>
+                    ) : copyState === 'error' ? (
+                      <>⚠ 실패</>
+                    ) : (
+                      <>
+                        <span aria-hidden>📋</span> 복사
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
