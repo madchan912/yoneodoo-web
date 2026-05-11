@@ -68,7 +68,8 @@ export default function RecipeManagePage() {
               <tr style={{ backgroundColor: '#1a1a1a' }}>
                 <th style={th}>ID</th>
                 <th style={th}>제목</th>
-                <th style={th}>상태</th>
+                <th style={th}>노출</th>
+                <th style={th}>파이프라인</th>
                 <th style={th}>videoId</th>
                 <th style={th}>유튜버</th>
                 <th style={{ ...th, textAlign: 'right' }}>액션</th>
@@ -77,13 +78,31 @@ export default function RecipeManagePage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ ...td, textAlign: 'center', color: '#666' }}>행이 없습니다.</td>
+                  <td colSpan={7} style={{ ...td, textAlign: 'center', color: '#666' }}>행이 없습니다.</td>
                 </tr>
               ) : (
-                rows.map((r) => (
-                  <tr key={r.id}>
+                rows.map((r) => {
+                  const isHidden = r.displayStatus === 'HIDDEN'
+                  return (
+                  <tr key={r.id} style={isHidden ? { opacity: 0.55 } : undefined}>
                     <td style={td}>{r.id}</td>
                     <td style={td}>{r.title}</td>
+                    <td style={td}>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: isHidden ? '#3f1212' : '#064e3b',
+                          color: isHidden ? '#fecaca' : '#a7f3d0',
+                          border: '1px solid ' + (isHidden ? '#7f1d1d' : '#065f46'),
+                        }}
+                      >
+                        {isHidden ? '숨김' : '노출'}
+                      </span>
+                    </td>
                     <td style={td}>{r.status ?? '—'}</td>
                     <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.videoId ?? '—'}</td>
                     <td style={td}>{r.youtuberName ?? '—'}</td>
@@ -106,7 +125,8 @@ export default function RecipeManagePage() {
                       </button>
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

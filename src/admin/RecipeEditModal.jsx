@@ -87,6 +87,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
   const [title, setTitle] = useState('')
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [ingredients, setIngredients] = useState([])
+  const [displayStatus, setDisplayStatus] = useState('ACTIVE')
 
   const load = useCallback(async () => {
     if (recipeId == null) return
@@ -99,6 +100,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
       setTitle(d.title ?? '')
       setYoutubeUrl(d.youtubeUrl ?? '')
       setIngredients(Array.isArray(d.ingredients) ? d.ingredients.map((it) => ({ name: it?.name ?? '', amount: it?.amount ?? '' })) : [])
+      setDisplayStatus(d.displayStatus === 'HIDDEN' ? 'HIDDEN' : 'ACTIVE')
     } catch (e) {
       setError('레시피 정보를 불러오지 못했습니다.')
     } finally {
@@ -137,6 +139,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
         title: title.trim(),
         youtubeUrl: youtubeUrl.trim(),
         ingredients: cleaned,
+        displayStatus,
       })
       if (typeof onSaved === 'function') onSaved(res.data)
       onClose?.()
@@ -180,13 +183,61 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
               </div>
 
               <div style={{ marginBottom: 14 }}>
-                <label style={labelStyle}>유튜브 링크 (youtubeUrl)</label>
+                <label style={labelStyle}>노출 상태 (displayStatus)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayStatus('ACTIVE')}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      border: '1px solid ' + (displayStatus === 'ACTIVE' ? '#10b981' : '#3f3f46'),
+                      background: displayStatus === 'ACTIVE' ? '#064e3b' : '#1a1a1a',
+                      color: displayStatus === 'ACTIVE' ? '#a7f3d0' : '#a1a1aa',
+                      fontWeight: displayStatus === 'ACTIVE' ? 'bold' : 'normal',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    {displayStatus === 'ACTIVE' ? '● ' : '○ '}노출 (ACTIVE)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDisplayStatus('HIDDEN')}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      border: '1px solid ' + (displayStatus === 'HIDDEN' ? '#dc2626' : '#3f3f46'),
+                      background: displayStatus === 'HIDDEN' ? '#3f1212' : '#1a1a1a',
+                      color: displayStatus === 'HIDDEN' ? '#fecaca' : '#a1a1aa',
+                      fontWeight: displayStatus === 'HIDDEN' ? 'bold' : 'normal',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                    }}
+                  >
+                    {displayStatus === 'HIDDEN' ? '● ' : '○ '}숨김 (HIDDEN)
+                  </button>
+                  <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                    HIDDEN 으로 저장하면 사용자 검색·목록에서 즉시 제외됩니다 (Soft Delete).
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>유튜브 링크 (youtubeUrl) — 읽기 전용</label>
                 <input
                   type="text"
-                  style={inputStyle}
+                  readOnly
+                  style={{
+                    ...inputStyle,
+                    background: '#0a0a0a',
+                    color: '#9ca3af',
+                    cursor: 'not-allowed',
+                    borderColor: '#2a2a2a',
+                  }}
                   value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
                   placeholder="https://www.youtube.com/watch?v=..."
+                  title="유튜브 링크는 원본 데이터 보존을 위해 수정할 수 없습니다."
                 />
               </div>
 

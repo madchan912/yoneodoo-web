@@ -4,14 +4,49 @@ import remarkGfm from 'remark-gfm'
 import { adminClient } from '../api/adminClient'
 
 const wrapStyle = {
-  border: '1px solid #333',
+  border: '1px solid #3a3a3a',
   borderRadius: 12,
   padding: '24px 28px',
-  backgroundColor: '#1a1a1a',
-  color: '#e5e5e5',
-  lineHeight: 1.7,
+  backgroundColor: '#1c1c1f',
+  color: '#f1f5f9',
+  lineHeight: 1.75,
   maxWidth: 960,
+  fontSize: '0.95rem',
 }
+
+const TASK_BOARD_CSS = `
+.tb-markdown { color: #f1f5f9; }
+.tb-markdown p { color: #e2e8f0; margin: 10px 0; }
+.tb-markdown strong { color: #fef3c7; font-weight: 700; }
+.tb-markdown em { color: #fbcfe8; }
+.tb-markdown ul, .tb-markdown ol { padding-left: 22px; margin: 8px 0; }
+.tb-markdown li { margin: 6px 0; color: #e2e8f0; }
+/* GFM task list */
+.tb-markdown li.task-list-item { list-style: none; margin-left: -22px; padding-left: 4px; }
+.tb-markdown input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: auto;
+  color-scheme: light;
+  width: 16px;
+  height: 16px;
+  margin: 0 8px 0 0;
+  vertical-align: middle;
+  accent-color: #10b981;
+  background-color: #ffffff;
+  border: 1px solid #94a3b8;
+  border-radius: 3px;
+  cursor: default;
+  flex-shrink: 0;
+}
+.tb-markdown li.task-list-item > input[type="checkbox"]:checked + * ,
+.tb-markdown li.task-list-item:has(input:checked) {
+  color: #a7f3d0;
+}
+.tb-markdown li.task-list-item:has(input:checked) {
+  text-decoration: line-through;
+  text-decoration-color: rgba(167, 243, 208, 0.6);
+}
+`
 
 const markdownComponents = {
   h1: ({ node, ...props }) => (
@@ -71,18 +106,9 @@ const markdownComponents = {
       {...props}
     />
   ),
-  ul: ({ node, ...props }) => <ul style={{ paddingLeft: 22 }} {...props} />,
-  ol: ({ node, ...props }) => <ol style={{ paddingLeft: 22 }} {...props} />,
-  li: ({ node, ...props }) => <li style={{ margin: '4px 0' }} {...props} />,
-  input: ({ node, checked, ...props }) => (
-    <input
-      type="checkbox"
-      checked={!!checked}
-      readOnly
-      style={{ accentColor: '#10b981', marginRight: 6, width: 16, height: 16 }}
-      {...props}
-    />
-  ),
+  ul: ({ node, ...props }) => <ul {...props} />,
+  ol: ({ node, ...props }) => <ol {...props} />,
+  li: ({ node, ...props }) => <li {...props} />,
   table: ({ node, ...props }) => (
     <table style={{ borderCollapse: 'collapse', width: '100%', margin: '12px 0' }} {...props} />
   ),
@@ -158,15 +184,18 @@ export default function TaskBoardPage() {
       )}
 
       {!error && (
-        <div style={wrapStyle}>
-          {loading ? (
-            <div style={{ color: '#888' }}>불러오는 중…</div>
-          ) : (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {content}
-            </ReactMarkdown>
-          )}
-        </div>
+        <>
+          <style>{TASK_BOARD_CSS}</style>
+          <div className="tb-markdown" style={wrapStyle}>
+            {loading ? (
+              <div style={{ color: '#888' }}>불러오는 중…</div>
+            ) : (
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {content}
+              </ReactMarkdown>
+            )}
+          </div>
+        </>
       )}
 
       {(path || readAt) && !loading && !error && (
