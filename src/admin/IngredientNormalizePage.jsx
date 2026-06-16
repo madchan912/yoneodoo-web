@@ -22,6 +22,9 @@ export default function IngredientNormalizePage() {
   /** @type {Record<string, boolean>} key = `${master}|||${raw}` */
   const [bulkChecked, setBulkChecked] = useState({})
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [jsonPasteModalOpen, setJsonPasteModalOpen] = useState(false)
+  const [jsonPasteText, setJsonPasteText] = useState('')
+  const [jsonPasteError, setJsonPasteError] = useState('')
   /** @type {[Set<string>, function]} 미분류에서 선택된 rawName 집합 (기존 selected와 동일 역할) */
   const [selected, setSelected] = useState(() => new Set())
   const [masterName, setMasterName] = useState('')
@@ -180,6 +183,51 @@ export default function IngredientNormalizePage() {
     }
   }
 
+  const handleJsonPasteOpen = () => {
+    setJsonPasteText('')
+    setJsonPasteError('')
+    setJsonPasteModalOpen(true)
+  }
+
+  const handleJsonPasteApply = () => {
+    setJsonPasteError('')
+    let parsed
+    try {
+      parsed = JSON.parse(jsonPasteText)
+    } catch {
+      setJsonPasteError('유효한 JSON 형식이 아닙니다.')
+      return
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      setJsonPasteError('최상위 값은 객체({ })여야 합니다.')
+      return
+    }
+    const entries = Object.entries(parsed)
+    if (entries.length === 0) {
+      setJsonPasteError('최소 한 개의 마스터명 항목이 필요합니다.')
+      return
+    }
+    for (const [master, raws] of entries) {
+      if (typeof master !== 'string' || master.trim() === '') {
+        setJsonPasteError('마스터명(키)은 비어 있지 않은 문자열이어야 합니다.')
+        return
+      }
+      if (!Array.isArray(raws) || raws.length === 0) {
+        setJsonPasteError(`"${master}"의 값은 비어 있지 않은 배열이어야 합니다.`)
+        return
+      }
+      for (const raw of raws) {
+        if (typeof raw !== 'string' || raw.trim() === '') {
+          setJsonPasteError(`"${master}" 배열 안에 비어 있는 문자열이 있습니다.`)
+          return
+        }
+      }
+    }
+    setBulkGroups(parsed)
+    setBulkModalOpen(true)
+    setJsonPasteModalOpen(false)
+  }
+
   const toggleBulkItem = (master, raw) => {
     const k = bulkCheckKey(master, raw)
     setBulkChecked((prev) => {
@@ -284,6 +332,23 @@ export default function IngredientNormalizePage() {
           }}
         >
           {bulkAnalyzing ? '분석 중…' : '🚀 전체 미분류 AI 그룹핑 분석'}
+        </button>
+        <button
+          type="button"
+          onClick={handleJsonPasteOpen}
+          disabled={loading}
+          style={{
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: '1px solid #3b82f6',
+            background: loading ? '#2a2a2a' : '#172554',
+            color: loading ? '#737373' : '#bfdbfe',
+            fontWeight: 800,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            fontSize: '0.9rem',
+          }}
+        >
+          📋 JSON 그룹핑 붙여넣기
         </button>
         <span style={{ fontSize: '0.8rem', color: '#737373', maxWidth: 520, lineHeight: 1.45 }}>
           미분류 재료 전체를 Gemini 에게 보내 마스터별 그룹을 받습니다. 결과는 승인 모달에서 검토한 뒤 일괄 저장됩니다 (자동 DB 저장 없음).
@@ -566,6 +631,148 @@ export default function IngredientNormalizePage() {
           }
         `}
       </style>
+
+      {jsonPasteModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="json-paste-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.82)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setJsonPasteModalOpen(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 640,
+              background: '#141414',
+              border: '1px solid #3f3f46',
+              borderRadius: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #2a2a2a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <div id="json-paste-modal-title" style={{ fontWeight: 900, color: '#fff', fontSize: '1.05rem' }}>
+                  JSON 그룹핑 붙여넣기
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#a1a1aa', marginTop: 4 }}>
+                  형식: {`{ "마스터명": ["raw1", "raw2", ...], ... }`}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setJsonPasteModalOpen(false)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #444',
+                  background: '#1f1f1f',
+                  color: '#e5e5e5',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                }}
+              >
+                닫기
+              </button>
+            </div>
+
+            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <textarea
+                value={jsonPasteText}
+                onChange={(e) => { setJsonPasteText(e.target.value); setJsonPasteError('') }}
+                placeholder={'{\n  "참치": ["참치1캔", "캔참치"],\n  "계란": ["달걀", "계란2개"]\n}'}
+                spellCheck={false}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  height: 240,
+                  padding: '12px 14px',
+                  borderRadius: 8,
+                  border: '1px solid ' + (jsonPasteError ? '#ef4444' : '#444'),
+                  backgroundColor: '#0f0f0f',
+                  color: '#f3f4f6',
+                  fontSize: '0.85rem',
+                  fontFamily: 'monospace',
+                  resize: 'vertical',
+                  lineHeight: 1.6,
+                }}
+              />
+              {jsonPasteError && (
+                <div style={{ color: '#f87171', fontSize: '0.82rem', padding: '8px 12px', background: '#2a1515', borderRadius: 8 }}>
+                  {jsonPasteError}
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #2a2a2a',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 10,
+                flexShrink: 0,
+                background: '#111',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setJsonPasteModalOpen(false)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  border: '1px solid #444',
+                  background: '#1e1e1e',
+                  color: '#e5e5e5',
+                  cursor: 'pointer',
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleJsonPasteApply}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#2563eb',
+                  color: '#fff',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 24px rgba(37,99,235,0.35)',
+                }}
+              >
+                검토 모달로 열기 →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {bulkModalOpen && bulkGroups && (
         <div
