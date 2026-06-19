@@ -32,6 +32,9 @@ export default function IngredientNormalizePage() {
   /** @type {[Set<string>, function]} 아코디언 펼쳐진 마스터명 집합 */
   const [expandedMasters, setExpandedMasters] = useState(() => new Set())
   const [mappedSearch, setMappedSearch] = useState('')
+  const [previewRawName, setPreviewRawName] = useState('')
+  const [previewRecipes, setPreviewRecipes] = useState([])
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const selectedIngredients = useMemo(() => Array.from(selected), [selected])
 
@@ -313,6 +316,24 @@ export default function IngredientNormalizePage() {
     }
   }
 
+  const handleRawNameClick = async (rawName) => {
+    setPreviewRawName(rawName)
+    setPreviewRecipes([])
+    setPreviewLoading(true)
+    try {
+      const res = await adminClient.get(
+        `/api/v1/admin/ingredients/unclassified/${encodeURIComponent(rawName)}/recipes`,
+      )
+      setPreviewRecipes(res.data || [])
+    } catch (e) {
+      const msg = e.response?.data?.message || e.response?.statusText || e.message
+      setError(typeof msg === 'string' ? msg : '레시피 목록을 불러오지 못했습니다.')
+      setPreviewRawName('')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
   const handleUnmap = async (rawName) => {
     setError('')
     setSuccess('')
@@ -504,7 +525,19 @@ export default function IngredientNormalizePage() {
                       onClick={(e) => e.stopPropagation()}
                       style={{ width: 18, height: 18, accentColor: '#3b82f6' }}
                     />
-                    <span style={{ flex: 1, color: '#f3f4f6', fontWeight: 500 }}>{r.rawName}</span>
+                    <span
+                      onClick={(e) => { e.stopPropagation(); handleRawNameClick(r.rawName) }}
+                      style={{
+                        flex: 1,
+                        color: '#f3f4f6',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textDecoration: 'underline dotted',
+                        textUnderlineOffset: 3,
+                      }}
+                    >
+                      {r.rawName}
+                    </span>
                     <span style={{ fontSize: '0.8rem', color: '#9ca3af', flexShrink: 0 }}>{r.occurrenceCount}회</span>
                   </li>
                 ))}
@@ -1236,6 +1269,163 @@ export default function IngredientNormalizePage() {
               >
                 {bulkSaving ? '저장 중…' : '일괄 승인 및 저장'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 재료명 클릭 — 포함 레시피 미리보기 모달 */}
+      {previewRawName && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="preview-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.82)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => !previewLoading && setPreviewRawName('')}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 720,
+              maxHeight: 'min(88vh, 920px)',
+              background: '#141414',
+              border: '1px solid #3f3f46',
+              borderRadius: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더 */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #2a2a2a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <div id="preview-modal-title" style={{ fontWeight: 900, color: '#fff', fontSize: '1.05rem' }}>
+                  [ {previewRawName} ] 포함 레시피
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#a1a1aa', marginTop: 4 }}>
+                  {previewLoading
+                    ? '불러오는 중…'
+                    : `${previewRecipes.length}개의 레시피에서 이 재료가 사용됩니다.`}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewRawName('')}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #444',
+                  background: '#1f1f1f',
+                  color: '#e5e5e5',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  flexShrink: 0,
+                }}
+              >
+                닫기
+              </button>
+            </div>
+
+            {/* 본문 */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 20px' }}>
+              {previewLoading ? (
+                <div style={{ color: '#888', textAlign: 'center', padding: 32 }}>불러오는 중…</div>
+              ) : previewRecipes.length === 0 ? (
+                <div style={{ color: '#666', textAlign: 'center', padding: 32 }}>
+                  이 재료가 포함된 레시피가 없습니다.
+                </div>
+              ) : (
+                previewRecipes.map((recipe, idx) => (
+                  <div
+                    key={recipe.id}
+                    style={{
+                      paddingBottom: 20,
+                      marginBottom: 20,
+                      borderBottom: idx < previewRecipes.length - 1 ? '1px solid #2a2a2a' : 'none',
+                    }}
+                  >
+                    {/* 레시피 메타 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, color: '#f3f4f6', fontSize: '0.95rem', flex: 1, minWidth: 0, wordBreak: 'break-word' }}>
+                        {recipe.title}
+                      </span>
+                      {recipe.status && (
+                        <span style={{
+                          flexShrink: 0,
+                          fontSize: '0.7rem',
+                          padding: '2px 7px',
+                          borderRadius: 6,
+                          background: recipe.status === 'SUCCESS' ? '#14532d' : '#3f1d1d',
+                          color: recipe.status === 'SUCCESS' ? '#86efac' : '#fca5a5',
+                          fontWeight: 600,
+                        }}>
+                          {recipe.status}
+                        </span>
+                      )}
+                      {recipe.displayStatus === 'HIDDEN' && (
+                        <span style={{
+                          flexShrink: 0,
+                          fontSize: '0.7rem',
+                          padding: '2px 7px',
+                          borderRadius: 6,
+                          background: '#292524',
+                          color: '#a8a29e',
+                          fontWeight: 600,
+                        }}>
+                          HIDDEN
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: 10 }}>
+                      {recipe.youtuberName || '—'}
+                    </div>
+                    {/* 유튜브 임베드 */}
+                    {recipe.videoId ? (
+                      <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+                        <iframe
+                          src={`https://www.youtube.com/embed/${recipe.videoId}`}
+                          title={recipe.title}
+                          loading="lazy"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            border: 'none',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: '0.8rem', color: '#525252', padding: '12px 0' }}>
+                        영상 ID가 없어 임베드할 수 없습니다.
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
