@@ -25,11 +25,46 @@ export default function IngredientNormalizePage() {
   const [jsonPasteModalOpen, setJsonPasteModalOpen] = useState(false)
   const [jsonPasteText, setJsonPasteText] = useState('')
   const [jsonPasteError, setJsonPasteError] = useState('')
-  /** @type {[Set<string>, function]} 미분류에서 선택된 rawName 집합 (기존 selected와 동일 역할) */
+  /** @type {[Set<string>, function]} 미분류에서 선택된 rawName 집합 */
   const [selected, setSelected] = useState(() => new Set())
   const [masterName, setMasterName] = useState('')
+  const [singleMappingModalOpen, setSingleMappingModalOpen] = useState(false)
+  /** @type {[Set<string>, function]} 아코디언 펼쳐진 마스터명 집합 */
+  const [expandedMasters, setExpandedMasters] = useState(() => new Set())
+  const [mappedSearch, setMappedSearch] = useState('')
 
   const selectedIngredients = useMemo(() => Array.from(selected), [selected])
+
+  /** mappedRows를 masterName 기준으로 그룹핑 */
+  const mappedGroups = useMemo(() => {
+    const map = new Map()
+    mappedRows.forEach((m) => {
+      if (!map.has(m.masterName)) map.set(m.masterName, [])
+      map.get(m.masterName).push({ rawName: m.rawName, createdAt: m.createdAt })
+    })
+    return map
+  }, [mappedRows])
+
+  /** 매핑 완료 목록: 검색어로 필터 후 ㄱㄴ순 정렬 */
+  const filteredSortedGroups = useMemo(() => {
+    const term = mappedSearch.trim().toLowerCase()
+    const entries = Array.from(mappedGroups.entries())
+    const filtered = term
+      ? entries.filter(
+          ([master, raws]) =>
+            master.toLowerCase().includes(term) ||
+            raws.some(({ rawName }) => rawName.toLowerCase().includes(term)),
+        )
+      : entries
+    return filtered.sort(([a], [b]) => a.localeCompare(b, 'ko'))
+  }, [mappedGroups, mappedSearch])
+
+  /** 단건 매핑 모달: 마스터명 입력값에 이미 매핑된 raw 미리보기 */
+  const existingRawsForMaster = useMemo(() => {
+    const key = masterName.trim()
+    if (!key) return []
+    return mappedGroups.get(key) ?? []
+  }, [masterName, mappedGroups])
 
   useEffect(() => {
     if (!bulkModalOpen || !bulkGroups) return
@@ -78,12 +113,22 @@ export default function IngredientNormalizePage() {
     })
   }
 
-  const selectAll = () => {
-    setSelected(new Set(rows.map((r) => r.rawName)))
+  const selectAll = () => setSelected(new Set(rows.map((r) => r.rawName)))
+  const clearSelection = () => setSelected(new Set())
+
+  const handleSingleMappingOpen = () => {
+    setMasterName('')
+    setSuggestionInfo('')
+    setSingleMappingModalOpen(true)
   }
 
-  const clearSelection = () => {
-    setSelected(new Set())
+  const toggleMasterExpand = (master) => {
+    setExpandedMasters((prev) => {
+      const next = new Set(prev)
+      if (next.has(master)) next.delete(master)
+      else next.add(master)
+      return next
+    })
   }
 
   const handleSave = async () => {
@@ -106,6 +151,7 @@ export default function IngredientNormalizePage() {
       })
       setSuccess(`저장 완료 (${selected.size}건). 목록을 새로고침합니다.`)
       setMasterName('')
+      setSingleMappingModalOpen(false)
       await load()
     } catch (e) {
       const msg = e.response?.data?.message || e.response?.statusText || e.message
@@ -309,29 +355,30 @@ export default function IngredientNormalizePage() {
     <div>
       <h2 style={{ marginTop: 0, color: '#fff' }}>재료 정규화 매핑</h2>
       <p style={{ color: '#888', fontSize: '0.9rem', maxWidth: 960 }}>
-        왼쪽 <strong style={{ color: '#d4d4d4' }}>미분류 목록</strong>에서 항목을 선택한 뒤, 가운데{' '}
-        <strong style={{ color: '#d4d4d4' }}>마스터명 입력·매핑 저장</strong>으로 묶습니다. 오른쪽{' '}
-        <strong style={{ color: '#d4d4d4' }}>매핑 완료 목록</strong>에서 개별 매핑을 해제할 수 있습니다. (이름은 서버에서 공백
-        제거 규칙으로 정규화됩니다.)
+        왼쪽 <strong style={{ color: '#d4d4d4' }}>미분류 목록</strong>에서 항목을 선택한 뒤{' '}
+        <strong style={{ color: '#d4d4d4' }}>[단건 매핑]</strong>으로 마스터명을 지정합니다. 오른쪽{' '}
+        <strong style={{ color: '#d4d4d4' }}>매핑 완료 목록</strong>에서 마스터명을 클릭해 raw 목록을 펼치고 개별 매핑을 해제할 수 있습니다.
+        (이름은 서버에서 공백 제거 규칙으로 정규화됩니다.)
       </p>
 
+      {/* 상단 버튼 영역 */}
       <div style={{ marginBottom: 18, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
         <button
           type="button"
-          onClick={handleBulkAnalyze}
-          disabled={bulkAnalyzing || loading}
+          onClick={handleSingleMappingOpen}
+          disabled={loading}
           style={{
             padding: '10px 16px',
             borderRadius: 10,
-            border: '1px solid #f97316',
-            background: bulkAnalyzing || loading ? '#2a2a2a' : '#431407',
-            color: bulkAnalyzing || loading ? '#737373' : '#ffedd5',
+            border: '1px solid #10b981',
+            background: loading ? '#2a2a2a' : '#052e16',
+            color: loading ? '#737373' : '#6ee7b7',
             fontWeight: 800,
-            cursor: bulkAnalyzing || loading ? 'not-allowed' : 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             fontSize: '0.9rem',
           }}
         >
-          {bulkAnalyzing ? '분석 중…' : '🚀 전체 미분류 AI 그룹핑 분석'}
+          + 단건 매핑
         </button>
         <button
           type="button"
@@ -348,7 +395,24 @@ export default function IngredientNormalizePage() {
             fontSize: '0.9rem',
           }}
         >
-          📋 JSON 그룹핑 붙여넣기
+          📋 JSON 일괄 등록
+        </button>
+        <button
+          type="button"
+          onClick={handleBulkAnalyze}
+          disabled={bulkAnalyzing || loading}
+          style={{
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: '1px solid #f97316',
+            background: bulkAnalyzing || loading ? '#2a2a2a' : '#431407',
+            color: bulkAnalyzing || loading ? '#737373' : '#ffedd5',
+            fontWeight: 800,
+            cursor: bulkAnalyzing || loading ? 'not-allowed' : 'pointer',
+            fontSize: '0.9rem',
+          }}
+        >
+          {bulkAnalyzing ? '분석 중…' : '🚀 AI 그룹핑 분석'}
         </button>
         <span style={{ fontSize: '0.8rem', color: '#737373', maxWidth: 520, lineHeight: 1.45 }}>
           미분류 재료 전체를 Gemini 에게 보내 마스터별 그룹을 받습니다. 결과는 승인 모달에서 검토한 뒤 일괄 저장됩니다 (자동 DB 저장 없음).
@@ -362,39 +426,21 @@ export default function IngredientNormalizePage() {
         <div style={{ color: '#6ee7b7', marginBottom: 12, padding: 12, background: '#14261f', borderRadius: 8 }}>{success}</div>
       )}
 
+      {/* 2열 그리드 */}
       <div
         className="ingredient-normalize-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) minmax(220px, 280px) minmax(0, 1fr)',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
           gap: 16,
           alignItems: 'stretch',
         }}
       >
-        {/* 1) 미분류 목록만 스크롤 */}
+        {/* 1) 미분류 목록 */}
         <section style={panelShell} aria-label="미분류 목록">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontWeight: 'bold', color: '#e5e5e5' }}>미분류 목록</span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={handleSuggest}
-                disabled={suggesting || selected.size === 0}
-                title={selected.size === 0 ? '재료를 먼저 선택하세요' : 'Gemini 로 마스터명 추천'}
-                style={{
-                  fontSize: '0.78rem',
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: '1px solid ' + (suggesting ? '#444' : '#a855f7'),
-                  background: suggesting ? '#1a1a1a' : selected.size === 0 ? '#1a1428' : '#2a1a3f',
-                  color: suggesting || selected.size === 0 ? '#7c6f99' : '#e9d5ff',
-                  cursor: suggesting || selected.size === 0 ? 'not-allowed' : 'pointer',
-                  fontWeight: 700,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {suggesting ? '추천 중…' : '✨ AI 매핑 추천'}
-              </button>
               <button
                 type="button"
                 onClick={selectAll}
@@ -467,154 +513,126 @@ export default function IngredientNormalizePage() {
           </div>
         </section>
 
-        {/* 2) 마스터명 + 저장 — 항상 한 열에 고정, 목록 스크롤과 분리 */}
-        <section
-          style={{
-            ...panelShell,
-            maxHeight: PANEL_MAX_H,
-            backgroundColor: '#161616',
-            borderColor: '#3f3f46',
-          }}
-          aria-label="마스터명 입력 및 매핑 저장"
-        >
-          <div style={{ fontWeight: 'bold', color: '#e5e5e5', marginBottom: 10 }}>마스터명 입력 · 저장</div>
-          <p style={{ fontSize: '0.8rem', color: '#a1a1aa', marginTop: 0, marginBottom: 12, lineHeight: 1.45 }}>
-            선택한 <strong style={{ color: '#fafafa' }}>{selected.size}</strong>개 원본을 아래 마스터명으로 매핑합니다.
-          </p>
-
-          {selectedIngredients.length > 0 && (
-            <div
-              style={{
-                maxHeight: 120,
-                overflowY: 'auto',
-                marginBottom: 12,
-                padding: '8px 10px',
-                borderRadius: 8,
-                background: '#0f0f0f',
-                border: '1px solid #333',
-                fontSize: '0.75rem',
-                color: '#a3a3a3',
-              }}
-            >
-              <div style={{ color: '#737373', marginBottom: 6 }}>선택된 재료</div>
-              <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.5 }}>
-                {selectedIngredients.slice(0, 40).map((name) => (
-                  <li key={name} style={{ wordBreak: 'break-all' }}>
-                    {name}
-                  </li>
-                ))}
-              </ul>
-              {selectedIngredients.length > 40 && (
-                <div style={{ marginTop: 6, color: '#525252' }}>외 {selectedIngredients.length - 40}건…</div>
-              )}
-            </div>
-          )}
-
-          <input
-            type="text"
-            value={masterName}
-            onChange={(e) => setMasterName(e.target.value)}
-            placeholder="예: 스팸 (또는 [✨ AI 매핑 추천] 버튼으로 자동 입력)"
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              padding: '12px 14px',
-              borderRadius: 8,
-              border: '1px solid #444',
-              backgroundColor: '#121212',
-              color: '#fff',
-              marginBottom: suggestionInfo ? 6 : 12,
-            }}
-          />
-          {suggestionInfo && (
-            <div
-              style={{
-                marginBottom: 12,
-                padding: '8px 10px',
-                background: '#2a1a3f',
-                border: '1px solid #6b21a8',
-                borderRadius: 8,
-                color: '#e9d5ff',
-                fontSize: '0.75rem',
-                lineHeight: 1.5,
-              }}
-            >
-              {suggestionInfo}
-            </div>
-          )}
-          <button
-            type="button"
-            disabled={saving || loading}
-            onClick={handleSave}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: 8,
-              border: 'none',
-              backgroundColor: saving ? '#444' : '#10b981',
-              color: '#fff',
-              fontWeight: 'bold',
-              cursor: saving || loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {saving ? '저장 중…' : '매핑 저장'}
-          </button>
-        </section>
-
-        {/* 3) 매핑 완료 목록만 스크롤 */}
+        {/* 2) 매핑 완료 목록 — 아코디언 */}
         <section style={panelShell} aria-label="매핑 완료 목록">
-          <div style={{ fontWeight: 'bold', color: '#e5e5e5', marginBottom: 12, flexShrink: 0 }}>매핑 완료 목록</div>
+          <div style={{ fontWeight: 'bold', color: '#e5e5e5', marginBottom: 10, flexShrink: 0 }}>
+            매핑 완료 목록
+            {mappedGroups.size > 0 && (
+              <span style={{ fontSize: '0.8rem', color: '#737373', fontWeight: 400, marginLeft: 8 }}>
+                ({mappedGroups.size}개 마스터 / {mappedRows.length}개 raw)
+              </span>
+            )}
+          </div>
+          {mappedGroups.size > 0 && (
+            <input
+              type="text"
+              value={mappedSearch}
+              onChange={(e) => setMappedSearch(e.target.value)}
+              placeholder="마스터명 또는 재료명 검색…"
+              style={{
+                flexShrink: 0,
+                marginBottom: 10,
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid #333',
+                backgroundColor: '#0f0f0f',
+                color: '#f3f4f6',
+                fontSize: '0.83rem',
+                outline: 'none',
+                width: '100%',
+                boxSizing: 'border-box',
+              }}
+            />
+          )}
           <div style={scrollListStyle}>
             {mappedLoading ? (
               <div style={{ color: '#888' }}>불러오는 중…</div>
-            ) : mappedRows.length === 0 ? (
+            ) : mappedGroups.size === 0 ? (
               <div style={{ color: '#666', textAlign: 'center', padding: 24 }}>매핑된 재료가 없습니다.</div>
+            ) : filteredSortedGroups.length === 0 ? (
+              <div style={{ color: '#666', textAlign: 'center', padding: 24 }}>검색 결과가 없습니다.</div>
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {mappedRows.map((m) => (
-                  <li
-                    key={m.rawName}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '10px 8px',
-                      borderBottom: '1px solid #2a2a2a',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <div style={{ color: '#f3f4f6', fontWeight: 500, wordBreak: 'break-all' }}>{m.rawName}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#93c5fd', marginTop: 4 }}>→ {m.masterName}</div>
-                      {m.createdAt != null && (
-                        <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: 4 }}>
-                          {typeof m.createdAt === 'string'
-                            ? m.createdAt
-                            : new Date(m.createdAt).toLocaleString('ko-KR')}
-                        </div>
+                {filteredSortedGroups.map(([master, raws]) => {
+                  const isOpen = expandedMasters.has(master)
+                  return (
+                    <li key={master} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                      {/* 아코디언 헤더 */}
+                      <button
+                        type="button"
+                        onClick={() => toggleMasterExpand(master)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '11px 8px',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ color: '#6b7280', fontSize: '0.8rem', flexShrink: 0, width: 16 }}>
+                          {isOpen ? '▼' : '▶'}
+                        </span>
+                        <span style={{ flex: 1, color: '#f3f4f6', fontWeight: 600 }}>{master}</span>
+                        <span style={{ fontSize: '0.78rem', color: '#6b7280', flexShrink: 0 }}>
+                          {raws.length}개
+                        </span>
+                      </button>
+                      {/* 아코디언 본문 */}
+                      {isOpen && (
+                        <ul style={{ listStyle: 'none', margin: 0, padding: '0 0 8px 28px' }}>
+                          {raws.map(({ rawName, createdAt }) => (
+                            <li
+                              key={rawName}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '7px 8px',
+                                borderTop: '1px solid #1f1f1f',
+                              }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ color: '#d4d4d4', fontSize: '0.85rem', wordBreak: 'break-all' }}>
+                                  {rawName}
+                                </div>
+                                {createdAt != null && (
+                                  <div style={{ fontSize: '0.7rem', color: '#525252', marginTop: 2 }}>
+                                    {typeof createdAt === 'string'
+                                      ? createdAt
+                                      : new Date(createdAt).toLocaleString('ko-KR')}
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={unmapping === rawName || saving}
+                                onClick={() => handleUnmap(rawName)}
+                                style={{
+                                  flexShrink: 0,
+                                  padding: '5px 10px',
+                                  borderRadius: 6,
+                                  border: '1px solid #b91c1c',
+                                  backgroundColor: unmapping === rawName ? '#3f1d1d' : '#7f1d1d',
+                                  color: '#fecaca',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  cursor: unmapping === rawName || saving ? 'not-allowed' : 'pointer',
+                                  opacity: unmapping === rawName || saving ? 0.7 : 1,
+                                }}
+                              >
+                                {unmapping === rawName ? '처리 중…' : '매핑 취소'}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       )}
-                    </div>
-                    <button
-                      type="button"
-                      disabled={unmapping === m.rawName || saving}
-                      onClick={() => handleUnmap(m.rawName)}
-                      style={{
-                        flexShrink: 0,
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: '1px solid #b91c1c',
-                        backgroundColor: unmapping === m.rawName ? '#3f1d1d' : '#7f1d1d',
-                        color: '#fecaca',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: unmapping === m.rawName || saving ? 'not-allowed' : 'pointer',
-                        opacity: unmapping === m.rawName || saving ? 0.7 : 1,
-                      }}
-                    >
-                      {unmapping === m.rawName ? '처리 중…' : '매핑 취소'}
-                    </button>
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
@@ -632,6 +650,239 @@ export default function IngredientNormalizePage() {
         `}
       </style>
 
+      {/* 단건 매핑 모달 */}
+      {singleMappingModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="single-mapping-modal-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.82)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => !saving && setSingleMappingModalOpen(false)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 560,
+              maxHeight: 'min(88vh, 800px)',
+              background: '#141414',
+              border: '1px solid #3f3f46',
+              borderRadius: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더 */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #2a2a2a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexShrink: 0,
+              }}
+            >
+              <div>
+                <div id="single-mapping-modal-title" style={{ fontWeight: 900, color: '#fff', fontSize: '1.05rem' }}>
+                  단건 매핑
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#a1a1aa', marginTop: 4 }}>
+                  선택한 <strong style={{ color: '#fafafa' }}>{selected.size}</strong>개 원본을 마스터명으로 매핑합니다.
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setSingleMappingModalOpen(false)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid #444',
+                  background: '#1f1f1f',
+                  color: '#e5e5e5',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  fontSize: '0.85rem',
+                }}
+              >
+                닫기
+              </button>
+            </div>
+
+            {/* 본문 */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* 선택된 재료 목록 */}
+              {selectedIngredients.length > 0 ? (
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    background: '#0f0f0f',
+                    border: '1px solid #333',
+                    fontSize: '0.78rem',
+                    color: '#a3a3a3',
+                  }}
+                >
+                  <div style={{ color: '#737373', marginBottom: 6 }}>선택된 재료</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
+                    {selectedIngredients.slice(0, 40).map((name) => (
+                      <li key={name} style={{ wordBreak: 'break-all' }}>{name}</li>
+                    ))}
+                  </ul>
+                  {selectedIngredients.length > 40 && (
+                    <div style={{ marginTop: 6, color: '#525252' }}>외 {selectedIngredients.length - 40}건…</div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ padding: '10px 12px', borderRadius: 8, background: '#1c1200', border: '1px solid #713f12', color: '#fbbf24', fontSize: '0.82rem' }}>
+                  미분류 목록에서 재료를 먼저 선택하세요.
+                </div>
+              )}
+
+              {/* 마스터명 입력 + AI 추천 */}
+              <div>
+                <div style={{ fontSize: '0.8rem', color: '#a1a1aa', marginBottom: 6 }}>마스터명</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={masterName}
+                    onChange={(e) => setMasterName(e.target.value)}
+                    placeholder="예: 스팸"
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #444',
+                      backgroundColor: '#121212',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSuggest}
+                    disabled={suggesting || selected.size === 0}
+                    title={selected.size === 0 ? '재료를 먼저 선택하세요' : 'Gemini 로 마스터명 추천'}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 8,
+                      border: '1px solid ' + (suggesting ? '#444' : '#a855f7'),
+                      background: suggesting ? '#1a1a1a' : selected.size === 0 ? '#1a1428' : '#2a1a3f',
+                      color: suggesting || selected.size === 0 ? '#7c6f99' : '#e9d5ff',
+                      cursor: suggesting || selected.size === 0 ? 'not-allowed' : 'pointer',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {suggesting ? '추천 중…' : '✨ AI 추천'}
+                  </button>
+                </div>
+              </div>
+
+              {/* AI 추천 정보 배너 */}
+              {suggestionInfo && (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    background: '#2a1a3f',
+                    border: '1px solid #6b21a8',
+                    borderRadius: 8,
+                    color: '#e9d5ff',
+                    fontSize: '0.78rem',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {suggestionInfo}
+                </div>
+              )}
+
+              {/* 기존 매핑 미리보기 */}
+              {existingRawsForMaster.length > 0 && (
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    background: '#0c1a2e',
+                    border: '1px solid #1e3a5f',
+                    fontSize: '0.78rem',
+                  }}
+                >
+                  <div style={{ color: '#93c5fd', marginBottom: 6 }}>
+                    ↳ &quot;{masterName.trim()}&quot; 에 이미 묶인 raw ({existingRawsForMaster.length}개)
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.6, color: '#7dd3fc' }}>
+                    {existingRawsForMaster.map(({ rawName }) => (
+                      <li key={rawName} style={{ wordBreak: 'break-all' }}>{rawName}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* 푸터 */}
+            <div
+              style={{
+                padding: '14px 20px',
+                borderTop: '1px solid #2a2a2a',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 10,
+                flexShrink: 0,
+                background: '#111',
+              }}
+            >
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setSingleMappingModalOpen(false)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  border: '1px solid #444',
+                  background: '#1e1e1e',
+                  color: '#e5e5e5',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={saving || loading}
+                onClick={handleSave}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: saving ? '#444' : '#10b981',
+                  color: '#fff',
+                  fontWeight: 800,
+                  cursor: saving || loading ? 'not-allowed' : 'pointer',
+                  boxShadow: saving ? 'none' : '0 8px 24px rgba(16,185,129,0.3)',
+                }}
+              >
+                {saving ? '저장 중…' : '매핑 저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JSON 일괄 등록 모달 */}
       {jsonPasteModalOpen && (
         <div
           role="dialog"
@@ -677,7 +928,7 @@ export default function IngredientNormalizePage() {
             >
               <div>
                 <div id="json-paste-modal-title" style={{ fontWeight: 900, color: '#fff', fontSize: '1.05rem' }}>
-                  JSON 그룹핑 붙여넣기
+                  JSON 일괄 등록
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#a1a1aa', marginTop: 4 }}>
                   형식: {`{ "마스터명": ["raw1", "raw2", ...], ... }`}
@@ -774,6 +1025,7 @@ export default function IngredientNormalizePage() {
         </div>
       )}
 
+      {/* AI 그룹핑 승인 모달 */}
       {bulkModalOpen && bulkGroups && (
         <div
           role="dialog"
@@ -845,57 +1097,100 @@ export default function IngredientNormalizePage() {
             </div>
 
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 20px' }}>
-              {Object.entries(bulkGroups).map(([master, raws]) => (
-                <section key={master} style={{ marginBottom: 22 }}>
-                  <div
-                    style={{
-                      fontWeight: 800,
-                      color: '#fdba74',
-                      marginBottom: 10,
-                      fontSize: '0.95rem',
-                      letterSpacing: '0.02em',
-                    }}
-                  >
-                    [ {master} ]
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                    {(raws || []).map((raw) => {
-                      const k = bulkCheckKey(master, raw)
-                      const checked = bulkChecked[k] !== false
-                      return (
-                        <label
-                          key={k}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 8,
-                            padding: '8px 12px',
-                            borderRadius: 10,
-                            border: '1px solid ' + (checked ? '#3f3f46' : '#525252'),
-                            background: checked ? '#1c1917' : '#0c0a09',
-                            color: checked ? '#f5f5f4' : '#78716c',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleBulkItem(master, raw)}
+              {Object.entries(bulkGroups).map(([master, raws]) => {
+                const existingRaws = mappedGroups.get(master) ?? []
+                return (
+                  <section key={master} style={{ marginBottom: 22 }}>
+                    <div
+                      style={{
+                        fontWeight: 800,
+                        color: '#fdba74',
+                        marginBottom: 10,
+                        fontSize: '0.95rem',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      [ {master} ]
+                    </div>
+                    {/* 기존 raw — disabled+checked 체크박스 */}
+                    {existingRaws.length > 0 && (
+                      <>
+                        <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: 6 }}>
+                          기존 ({existingRaws.length}개)
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                          {existingRaws.map(({ rawName }) => (
+                            <label
+                              key={rawName}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '8px 12px',
+                                borderRadius: 10,
+                                border: '1px solid #3f3f46',
+                                background: '#1c1917',
+                                color: '#f5f5f4',
+                                fontSize: '0.85rem',
+                                opacity: 0.4,
+                                cursor: 'default',
+                                pointerEvents: 'none',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked
+                                readOnly
+                                disabled
+                                style={{ width: 16, height: 16, accentColor: '#f97316', cursor: 'default' }}
+                              />
+                              <span style={{ wordBreak: 'break-all' }}>{rawName}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#a1a1aa', marginBottom: 8 }}>새로 추가</div>
+                      </>
+                    )}
+                    {/* 새로 추가될 raw — 체크박스 */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                      {(raws || []).map((raw) => {
+                        const k = bulkCheckKey(master, raw)
+                        const checked = bulkChecked[k] !== false
+                        return (
+                          <label
+                            key={k}
                             style={{
-                              width: 16,
-                              height: 16,
-                              accentColor: '#f97316',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '8px 12px',
+                              borderRadius: 10,
+                              border: '1px solid ' + (checked ? '#3f3f46' : '#525252'),
+                              background: checked ? '#1c1917' : '#0c0a09',
+                              color: checked ? '#f5f5f4' : '#78716c',
                               cursor: 'pointer',
+                              fontSize: '0.85rem',
                             }}
-                          />
-                          <span style={{ wordBreak: 'break-all' }}>{raw}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </section>
-              ))}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleBulkItem(master, raw)}
+                              style={{
+                                width: 16,
+                                height: 16,
+                                accentColor: '#f97316',
+                                cursor: 'pointer',
+                              }}
+                            />
+                            <span style={{ wordBreak: 'break-all' }}>{raw}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </section>
+                )
+              })}
             </div>
 
             <div
