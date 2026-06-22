@@ -8,11 +8,18 @@ function App() {
   const [ingredientsModalRecipe, setIngredientsModalRecipe] = useState(null)
   const [showAmount, setShowAmount] = useState(false)
 
-  // 1. 상태 분리: 필터(도마) vs 냉장고(창고)
+  // 검색 모드: 'ingredient' | 'title'
+  const [searchMode, setSearchMode] = useState('ingredient')
+
+  // 재료 검색 상태
   const [searchTerm, setSearchTerm] = useState('')
-  const [suggestions, setSuggestions] = useState([]) 
+  const [suggestions, setSuggestions] = useState([])
   const [searchTags, setSearchTags] = useState([])
-  const [selectedIndex, setSelectedIndex] = useState(-1) 
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+
+  // 요리명 검색 상태
+  const [titleQuery, setTitleQuery] = useState('')
+  const [titleResults, setTitleResults] = useState([])
 
   const [myFridge, setMyFridge] = useState(() => {
     const saved = localStorage.getItem('yoneodoo_real_fridge')
@@ -79,6 +86,40 @@ function App() {
         setFridgeSelectedIndex(-1)
       })
   }, [fridgeSearchTerm, myFridge])
+
+  // 요리명 검색: 300ms 디바운스 후 서버 API 호출
+  useEffect(() => {
+    if (titleQuery.trim() === '') {
+      setTitleResults([])
+      return
+    }
+    const timer = setTimeout(() => {
+      const base = getApiBaseUrl()
+      axios.get(`${base}/api/v1/recipes/search?q=${encodeURIComponent(titleQuery)}`)
+        .then(response => {
+          setTitleResults(response.data.map(recipe => ({
+            id: recipe.id,
+            title: recipe.title,
+            youtuberName: recipe.youtuberName,
+            videoId: recipe.videoId,
+            mainIngredients: recipe.ingredients ?? [],
+            subIngredients: [],
+          })))
+        })
+        .catch(error => console.error('요리명 검색 실패:', error))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [titleQuery])
+
+  const switchSearchMode = (mode) => {
+    setSearchMode(mode)
+    setSearchTerm('')
+    setSuggestions([])
+    setSearchTags([])
+    setSelectedIndex(-1)
+    setTitleQuery('')
+    setTitleResults([])
+  }
 
   const toggleSearchTag = (ingredientName) => {
     if (searchTags.includes(ingredientName)) {
@@ -311,69 +352,148 @@ function App() {
         <h1 style={{ color: '#ffffff', fontWeight: '900', fontSize: '2.8rem', margin: 0 }}>👨‍🍳 요너두</h1>
       </div>
 
-      <div style={{ maxWidth: '600px', margin: '0 auto 40px auto', position: 'relative' }}>
-        <input 
-          type="text" 
-          placeholder="오늘 꼭 써야 할 재료 (검색 후 엔터!)" 
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={handleKeyDown} 
-          style={{ width: '100%', padding: '15px 20px', borderRadius: '12px', border: '2px solid #3b82f6', backgroundColor: '#1e1e1e', color: '#ffffff', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
-        />
+      <div style={{ maxWidth: '600px', margin: '0 auto 40px auto' }}>
+        {/* 검색 모드 토글 */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <button
+            onClick={() => switchSearchMode('ingredient')}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: '10px', border: 'none', cursor: 'pointer',
+              fontWeight: 'bold', fontSize: '0.95rem',
+              backgroundColor: searchMode === 'ingredient' ? '#3b82f6' : '#2d2d2d',
+              color: searchMode === 'ingredient' ? '#fff' : '#aaa',
+            }}
+          >
+            🥕 재료로 찾기
+          </button>
+          <button
+            onClick={() => switchSearchMode('title')}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: '10px', border: 'none', cursor: 'pointer',
+              fontWeight: 'bold', fontSize: '0.95rem',
+              backgroundColor: searchMode === 'title' ? '#3b82f6' : '#2d2d2d',
+              color: searchMode === 'title' ? '#fff' : '#aaa',
+            }}
+          >
+            🍳 요리명으로 찾기
+          </button>
+        </div>
 
-        {suggestions.length > 0 && (
-          <ul style={{ position: 'absolute', top: '60px', left: 0, right: 0, backgroundColor: '#1e1e1e', borderRadius: '12px', listStyle: 'none', padding: '8px 0', margin: 0, boxShadow: '0 8px 16px rgba(0,0,0,0.8)', zIndex: 100, border: '1px solid #333' }}>
-            {suggestions.map((item, index) => (
-              <li 
-                key={item.id} 
-                onClick={() => toggleSearchTag(item.name)}
-                style={{ 
-                  padding: '10px 20px', cursor: 'pointer', fontSize: '0.95rem', color: '#ffffff',
-                  backgroundColor: index === selectedIndex ? '#2d2d2d' : 'transparent' 
-                }}
-              >
-                🔍 {item.name}
-              </li>
-            ))}
-          </ul>
+        {/* 재료 검색 모드 */}
+        {searchMode === 'ingredient' && (
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="오늘 꼭 써야 할 재료 (검색 후 엔터!)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{ width: '100%', padding: '15px 20px', borderRadius: '12px', border: '2px solid #3b82f6', backgroundColor: '#1e1e1e', color: '#ffffff', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+            />
+
+            {suggestions.length > 0 && (
+              <ul style={{ position: 'absolute', top: '60px', left: 0, right: 0, backgroundColor: '#1e1e1e', borderRadius: '12px', listStyle: 'none', padding: '8px 0', margin: 0, boxShadow: '0 8px 16px rgba(0,0,0,0.8)', zIndex: 100, border: '1px solid #333' }}>
+                {suggestions.map((item, index) => (
+                  <li
+                    key={item.id}
+                    onClick={() => toggleSearchTag(item.name)}
+                    style={{
+                      padding: '10px 20px', cursor: 'pointer', fontSize: '0.95rem', color: '#ffffff',
+                      backgroundColor: index === selectedIndex ? '#2d2d2d' : 'transparent'
+                    }}
+                  >
+                    🔍 {item.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {searchTags.length > 0 && (
+              <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#1a1a1a', borderRadius: '12px', border: '1px dashed #444' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#aaa', fontWeight: 'bold' }}>🎯 현재 적용된 필수 필터</span>
+                  <button onClick={() => setSearchTags([])} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 'bold' }}>🗑️ 필터 초기화</button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {searchTags.map(tag => (
+                    <div key={tag} style={{ backgroundColor: '#3b82f6', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>
+                      {tag} <span onClick={() => toggleSearchTag(tag)} style={{ marginLeft: '8px', cursor: 'pointer', fontWeight: 'bold' }}>×</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
-        {searchTags.length > 0 && (
-          <div style={{ marginTop: '15px', padding: '15px', backgroundColor: '#1a1a1a', borderRadius: '12px', border: '1px dashed #444' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '0.9rem', color: '#aaa', fontWeight: 'bold' }}>🎯 현재 적용된 필수 필터</span>
-              <button onClick={() => setSearchTags([])} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 'bold' }}>🗑️ 필터 초기화</button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {searchTags.map(tag => (
-                <div key={tag} style={{ backgroundColor: '#3b82f6', color: 'white', padding: '6px 12px', borderRadius: '8px', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>
-                  {tag} <span onClick={() => toggleSearchTag(tag)} style={{ marginLeft: '8px', cursor: 'pointer', fontWeight: 'bold' }}>×</span>
-                </div>
-              ))}
-            </div>
+        {/* 요리명 검색 모드 */}
+        {searchMode === 'title' && (
+          <div>
+            <input
+              type="text"
+              placeholder="요리 이름을 검색하세요 (예: 김치볶음밥)"
+              value={titleQuery}
+              onChange={(e) => setTitleQuery(e.target.value)}
+              style={{ width: '100%', padding: '15px 20px', borderRadius: '12px', border: '2px solid #3b82f6', backgroundColor: '#1e1e1e', color: '#ffffff', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+            />
           </div>
         )}
       </div>
       
-      {myFridge.length > 0 && searchTags.length === 0 && (
-        <div style={{ marginBottom: '50px' }}>
-          <h2 style={{ color: '#10b981', fontSize: '1.5rem', marginBottom: '25px', fontWeight: 'bold' }}>🧊 내 냉장고 파먹기 추천 (Top 5)</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
-            {recommendedRecipes.map(recipe => renderRecipeCard(recipe, true))}
+      {/* 재료 모드: 냉장고 추천 + 전체/필터 목록 */}
+      {searchMode === 'ingredient' && (
+        <>
+          {myFridge.length > 0 && searchTags.length === 0 && (
+            <div style={{ marginBottom: '50px' }}>
+              <h2 style={{ color: '#10b981', fontSize: '1.5rem', marginBottom: '25px', fontWeight: 'bold' }}>🧊 내 냉장고 파먹기 추천 (Top 5)</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
+                {recommendedRecipes.map(recipe => renderRecipeCard(recipe, true))}
+              </div>
+              <hr style={{ border: '0', height: '1px', backgroundColor: '#333', marginTop: '40px' }} />
+            </div>
+          )}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ color: '#fff', fontSize: '1.3rem', margin: 0 }}>{searchTags.length > 0 ? `🎯 필터링된 레시피 (${filteredAllRecipes.length}개)` : `전체 레시피 탐색 (${recipes.length}개)`}</h2>
+              <button onClick={() => setShowAmount(!showAmount)} style={{ backgroundColor: showAmount ? '#2d2d2d' : '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold' }}>{showAmount ? "⚖️ 용량 숨기기" : "⚖️ 용량 보기"}</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
+              {filteredAllRecipes.map(recipe => renderRecipeCard(recipe, false))}
+            </div>
           </div>
-          <hr style={{ border: '0', height: '1px', backgroundColor: '#333', marginTop: '40px' }} />
-        </div>
+        </>
       )}
 
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ color: '#fff', fontSize: '1.3rem', margin: 0 }}>{searchTags.length > 0 ? `🎯 필터링된 레시피 (${filteredAllRecipes.length}개)` : `전체 레시피 탐색 (${recipes.length}개)`}</h2>
-          <button onClick={() => setShowAmount(!showAmount)} style={{ backgroundColor: showAmount ? '#2d2d2d' : '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold' }}>{showAmount ? "⚖️ 용량 숨기기" : "⚖️ 용량 보기"}</button>
+      {/* 요리명 검색 모드: 검색 결과 또는 안내 문구 */}
+      {searchMode === 'title' && (
+        <div>
+          {titleQuery.trim() === '' ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ color: '#fff', fontSize: '1.3rem', margin: 0 }}>전체 레시피 탐색 ({recipes.length}개)</h2>
+                <button onClick={() => setShowAmount(!showAmount)} style={{ backgroundColor: showAmount ? '#2d2d2d' : '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold' }}>{showAmount ? '⚖️ 용량 숨기기' : '⚖️ 용량 보기'}</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
+                {recipes.map(recipe => renderRecipeCard(recipe, false))}
+              </div>
+            </>
+          ) : titleResults.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#555', padding: '60px 0', fontSize: '1rem' }}>
+              "{titleQuery}"에 해당하는 레시피가 없습니다.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ color: '#fff', fontSize: '1.3rem', margin: 0 }}>🍳 "{titleQuery}" 검색 결과 ({titleResults.length}개)</h2>
+                <button onClick={() => setShowAmount(!showAmount)} style={{ backgroundColor: showAmount ? '#2d2d2d' : '#3b82f6', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '0.9rem', cursor: 'pointer', fontWeight: 'bold' }}>{showAmount ? "⚖️ 용량 숨기기" : "⚖️ 용량 보기"}</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
+                {titleResults.map(recipe => renderRecipeCard(recipe, false))}
+              </div>
+            </>
+          )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
-          {filteredAllRecipes.map(recipe => renderRecipeCard(recipe, false))}
-        </div>
-      </div>
+      )}
 
       <footer style={{ textAlign: 'center', marginTop: 48, paddingBottom: 16, color: '#3a3a3a', fontSize: '0.75rem' }}>
         © 2026 요너두. All rights reserved.
