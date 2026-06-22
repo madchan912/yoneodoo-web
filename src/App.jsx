@@ -43,7 +43,7 @@ function App() {
     axios.get(`${base}/api/v1/recipes`)
       .then(response => {
         const realRecipes = response.data
-          .filter(recipe => recipe.status === 'SUCCESS' && recipe.ingredients && recipe.ingredients.length > 0)
+          .filter(recipe => recipe.ingredients && recipe.ingredients.length > 0)
           .map(recipe => ({
             id: recipe.id,
             title: recipe.title,
