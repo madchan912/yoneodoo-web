@@ -4,7 +4,6 @@ import { adminClient } from '../api/adminClient'
 import AdminLoginPage from './AdminLoginPage'
 import RecipeManagePage from './RecipeManagePage'
 import IngredientMappingPage from './IngredientMappingPage'
-import TaskBoardPage from './TaskBoardPage'
 import { clearAdminSecret, getAdminSecret } from './adminSession'
 
 function AdminIndexGate() {
@@ -51,9 +50,6 @@ function AdminShell() {
       <aside style={{ width: 220, borderRight: '1px solid #333', padding: '20px 12px', flexShrink: 0 }}>
         <div style={{ fontWeight: '900', color: '#fff', marginBottom: 24, paddingLeft: 8 }}>요너두 Admin</div>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <NavLink to="/admin/tasks" style={({ isActive }) => ({ ...linkBase, ...(isActive ? linkActive : {}) })}>
-            대시보드 / 로드맵
-          </NavLink>
           <NavLink to="/admin/recipes" end style={({ isActive }) => ({ ...linkBase, ...(isActive ? linkActive : {}) })}>
             레시피 관리
           </NavLink>
@@ -120,7 +116,6 @@ export default function AdminRoutes() {
         <Route element={<AdminShell />}>
           <Route path="recipes" element={<RecipeManagePage />} />
           <Route path="ingredients" element={<IngredientMappingPage />} />
-          <Route path="tasks" element={<TaskBoardPage />} />
         </Route>
       </Route>
     </Routes>
