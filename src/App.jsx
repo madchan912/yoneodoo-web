@@ -375,6 +375,10 @@ function App() {
         </div>
       </div>
 
+      <footer style={{ textAlign: 'center', marginTop: 48, paddingBottom: 16, color: '#3a3a3a', fontSize: '0.75rem' }}>
+        © 2026 요너두. All rights reserved.
+      </footer>
+
       {isFridgeOpen && (
         <div onClick={() => setIsFridgeOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#1e1e1e', padding: '30px', borderRadius: '20px', width: '90%', maxWidth: '500px', border: '1px solid #444', position: 'relative', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>

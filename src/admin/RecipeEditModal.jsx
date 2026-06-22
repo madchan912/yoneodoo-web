@@ -167,6 +167,18 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
       setError('요리명은 비울 수 없습니다.')
       return
     }
+
+    let effectiveDisplayStatus = displayStatus
+    if (status === 'SUCCESS' && displayStatus === 'HIDDEN') {
+      const confirmed = window.confirm(
+        'status를 SUCCESS로 변경했습니다. 노출 상태도 ACTIVE로 변경할까요?',
+      )
+      if (confirmed) {
+        effectiveDisplayStatus = 'ACTIVE'
+        setDisplayStatus('ACTIVE')
+      }
+    }
+
     setSaving(true)
     try {
       const cleaned = ingredients
@@ -176,7 +188,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
         title: title.trim(),
         youtubeUrl: youtubeUrl.trim(),
         ingredients: cleaned,
-        displayStatus,
+        displayStatus: effectiveDisplayStatus,
         status: status === '' ? null : status,
       })
       if (typeof onSaved === 'function') onSaved(res.data)
@@ -293,7 +305,13 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <select
                     value={status ?? ''}
-                    onChange={(e) => setStatus(e.target.value)}
+                    onChange={(e) => {
+                      const newStatus = e.target.value
+                      setStatus(newStatus)
+                      if (newStatus === 'NO_SUBTITLES' || newStatus === 'FAILED') {
+                        setDisplayStatus('HIDDEN')
+                      }
+                    }}
                     style={{
                       ...inputStyle,
                       flex: '0 0 auto',
@@ -308,25 +326,6 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
                     <option value="PENDING">PENDING — 처리 대기</option>
                     <option value="FAILED">FAILED — 처리 실패</option>
                   </select>
-                  {originalStatus !== 'SUCCESS' && (
-                    <button
-                      type="button"
-                      onClick={() => setStatus('SUCCESS')}
-                      title="수동 보강을 마쳤다면 한 번에 SUCCESS 로 승급"
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: '1px solid #10b981',
-                        background: status === 'SUCCESS' ? '#064e3b' : '#0f1f1a',
-                        color: '#a7f3d0',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                      }}
-                    >
-                      ✓ SUCCESS 로 승급
-                    </button>
-                  )}
                 </div>
                 {status && status !== originalStatus && (
                   <div style={{ marginTop: 6, fontSize: '0.75rem', color: '#fcd34d' }}>

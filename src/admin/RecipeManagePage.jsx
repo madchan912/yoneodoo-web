@@ -6,17 +6,17 @@ const th = { textAlign: 'left', padding: '12px 10px', borderBottom: '1px solid #
 const td = { padding: '12px 10px', borderBottom: '1px solid #222', fontSize: '0.9rem' }
 
 export default function RecipeManagePage() {
-  const [filter, setFilter] = useState('all')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const load = useCallback(async (currentFilter) => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await adminClient.get('/api/v1/admin/recipes', { params: { filter: currentFilter } })
+      const res = await adminClient.get('/api/v1/admin/recipes', { params: { filter: 'all' } })
       setRows(res.data || [])
     } catch (e) {
       setError('목록을 불러오지 못했습니다. 시크릿 또는 API를 확인하세요.')
@@ -26,37 +26,45 @@ export default function RecipeManagePage() {
   }, [])
 
   useEffect(() => {
-    load(filter)
-  }, [filter, load])
+    load()
+  }, [load])
 
-  const btn = (key, label) => (
-    <button
-      type="button"
-      onClick={() => setFilter(key)}
-      style={{
-        marginRight: 8,
-        marginBottom: 8,
-        padding: '8px 14px',
-        borderRadius: 8,
-        border: filter === key ? '2px solid #3b82f6' : '1px solid #444',
-        backgroundColor: filter === key ? '#1e3a5f' : '#1e1e1e',
-        color: '#e5e5e5',
-        cursor: 'pointer',
-        fontWeight: filter === key ? 'bold' : 'normal',
-      }}
-    >
-      {label}
-    </button>
-  )
+  const q = searchQuery.trim().toLowerCase()
+  const filteredRows = q
+    ? rows.filter(
+        (r) =>
+          r.title?.toLowerCase().includes(q) ||
+          r.youtuberName?.toLowerCase().includes(q),
+      )
+    : rows
 
   return (
     <div>
-      <h2 style={{ marginTop: 0, color: '#fff' }}>레시피 관리</h2>
-      <p style={{ color: '#888', fontSize: '0.9rem' }}>상태 필터(껍데기). 실제 상태 값은 API와 파이프라인 기준에 맞춰 조정 예정입니다.</p>
+      <h2 style={{ marginTop: 0, color: '#fff' }}>
+        레시피 관리
+        <span style={{ fontSize: '0.85rem', fontWeight: 400, color: '#6b7280', marginLeft: 10 }}>
+          ({q ? `${filteredRows.length} / ${rows.length}건` : `${rows.length}건`})
+        </span>
+      </h2>
       <div style={{ marginBottom: 20 }}>
-        {btn('all', '전체')}
-        {btn('pending', '대기')}
-        {btn('no_subtitles', '자막 없음')}
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="제목 또는 유튜버명 검색…"
+          style={{
+            width: '100%',
+            maxWidth: 480,
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid #444',
+            backgroundColor: '#1a1a1a',
+            color: '#f3f4f6',
+            fontSize: '0.9rem',
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
       </div>
       {error && <div style={{ color: '#f87171', marginBottom: 12 }}>{error}</div>}
       {loading ? (
@@ -76,12 +84,14 @@ export default function RecipeManagePage() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ ...td, textAlign: 'center', color: '#666' }}>행이 없습니다.</td>
+                  <td colSpan={7} style={{ ...td, textAlign: 'center', color: '#666' }}>
+                    {q ? '검색 결과가 없습니다.' : '행이 없습니다.'}
+                  </td>
                 </tr>
               ) : (
-                rows.map((r) => {
+                filteredRows.map((r) => {
                   const isHidden = r.displayStatus === 'HIDDEN'
                   return (
                   <tr key={r.id} style={isHidden ? { opacity: 0.55 } : undefined}>
@@ -137,7 +147,7 @@ export default function RecipeManagePage() {
         <RecipeEditModal
           recipeId={editingId}
           onClose={() => setEditingId(null)}
-          onSaved={() => load(filter)}
+          onSaved={() => load()}
         />
       )}
     </div>
