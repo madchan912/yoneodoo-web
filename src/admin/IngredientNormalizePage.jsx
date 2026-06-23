@@ -1300,6 +1300,7 @@ export default function IngredientNormalizePage() {
           onSaved={() => {
             setEditRecipeId(null)
             handlePreviewRefetch()
+            load()
           }}
         />
       )}
