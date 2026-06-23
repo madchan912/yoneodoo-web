@@ -60,8 +60,8 @@ export default function RecipeManagePage() {
   const [searchQuery, setSearchQuery] = useState('')
 
   // 정렬
-  const [sortKey, setSortKey] = useState('id')
-  const [sortDir, setSortDir] = useState('asc')
+  const [sortKey, setSortKey] = useState('updatedAt')
+  const [sortDir, setSortDir] = useState('desc')
 
   // 필터
   const [filterDisplay, setFilterDisplay] = useState('')   // '' | 'ACTIVE' | 'HIDDEN'
