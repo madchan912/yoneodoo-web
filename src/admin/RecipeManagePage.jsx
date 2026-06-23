@@ -7,7 +7,7 @@ const td = { padding: '12px 10px', borderBottom: '1px solid #222', fontSize: '0.
 
 const SORT_KEYS = ['id', 'title', 'displayStatus', 'status', 'youtuberName', 'updatedAt']
 
-const STATUS_OPTIONS = ['', 'SUCCESS', 'PENDING', 'NO_SUBTITLES', 'FAILED', 'SKIP']
+const STATUS_OPTIONS = ['', 'SUCCESS', 'PENDING', 'NO_SUBTITLES', 'AI_ERROR']
 
 function SortIcon({ active, dir }) {
   if (!active) return <span style={{ color: '#444', marginLeft: 4 }}>↕</span>
@@ -334,8 +334,7 @@ function StatusBadge({ status }) {
     SUCCESS: { bg: '#14532d', color: '#86efac', border: '#166534' },
     PENDING: { bg: '#1c1a00', color: '#fde68a', border: '#713f12' },
     NO_SUBTITLES: { bg: '#3f1212', color: '#fca5a5', border: '#7f1d1d' },
-    FAILED: { bg: '#3f1212', color: '#fca5a5', border: '#7f1d1d' },
-    SKIP: { bg: '#1c1c1c', color: '#a1a1aa', border: '#3f3f46' },
+    AI_ERROR: { bg: '#2d1b4e', color: '#d8b4fe', border: '#6b21a8' },
   }
   const c = colors[status] ?? { bg: '#1c1c1c', color: '#a1a1aa', border: '#3f3f46' }
   return (
