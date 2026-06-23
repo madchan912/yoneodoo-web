@@ -79,7 +79,7 @@ const smallBtn = {
   fontSize: '0.8rem',
 }
 
-export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
+export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zIndexProp }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -202,7 +202,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved }) {
   }
 
   return (
-    <div style={overlay} onClick={onClose}>
+    <div style={{ ...overlay, zIndex: zIndexProp ?? 9999 }} onClick={onClose}>
       <div style={card} onClick={(e) => e.stopPropagation()}>
         <div style={header}>
           <div>

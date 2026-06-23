@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { adminClient } from '../api/adminClient'
+import RecipeEditModal from './RecipeEditModal'
 
 const PANEL_MAX_H = 'min(72vh, 880px)'
 
@@ -35,6 +36,7 @@ export default function IngredientNormalizePage() {
   const [previewRawName, setPreviewRawName] = useState('')
   const [previewRecipes, setPreviewRecipes] = useState([])
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [editRecipeId, setEditRecipeId] = useState(null)
 
   const selectedIngredients = useMemo(() => Array.from(selected), [selected])
 
@@ -333,6 +335,22 @@ export default function IngredientNormalizePage() {
       setPreviewLoading(false)
     }
   }
+
+  const handlePreviewRefetch = useCallback(async () => {
+    if (!previewRawName) return
+    setPreviewLoading(true)
+    try {
+      const res = await adminClient.get(
+        `/api/v1/admin/ingredients/unclassified/${encodeURIComponent(previewRawName)}/recipes`,
+      )
+      setPreviewRecipes(res.data || [])
+    } catch (e) {
+      const msg = e.response?.data?.message || e.response?.statusText || e.message
+      setError(typeof msg === 'string' ? msg : '레시피 목록을 새로고침하지 못했습니다.')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }, [previewRawName])
 
   const handleUnmap = async (rawName) => {
     setError('')
@@ -1273,6 +1291,19 @@ export default function IngredientNormalizePage() {
           </div>
         </div>
       )}
+      {/* 레시피 수정 모달 — 미리보기 모달(10000) 위에 쌓이도록 zIndex=11000 */}
+      {editRecipeId != null && (
+        <RecipeEditModal
+          recipeId={editRecipeId}
+          zIndex={11000}
+          onClose={() => setEditRecipeId(null)}
+          onSaved={() => {
+            setEditRecipeId(null)
+            handlePreviewRefetch()
+          }}
+        />
+      )}
+
       {/* 재료명 클릭 — 포함 레시피 미리보기 모달 */}
       {previewRawName && (
         <div
@@ -1396,6 +1427,23 @@ export default function IngredientNormalizePage() {
                           HIDDEN
                         </span>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => setEditRecipeId(recipe.id)}
+                        style={{
+                          flexShrink: 0,
+                          fontSize: '0.72rem',
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          border: '1px solid #4b5563',
+                          background: '#1f2937',
+                          color: '#d1d5db',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✏️ 수정
+                      </button>
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: 10 }}>
                       {recipe.youtuberName || '—'}
