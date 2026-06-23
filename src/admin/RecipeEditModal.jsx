@@ -34,7 +34,6 @@ const header = {
   flexShrink: 0,
 }
 
-// 상단 고정 영역 (제목·상태·유튜브링크) — 스크롤 없음
 const topSection = {
   padding: '16px 20px',
   borderBottom: '1px solid #2a2a2a',
@@ -44,7 +43,6 @@ const topSection = {
   gap: 12,
 }
 
-// 좌우 분할 영역 — 나머지 공간 모두 차지
 const splitRow = {
   display: 'flex',
   flex: 1,
@@ -111,8 +109,7 @@ const ingRow = {
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto',
   gap: 8,
-  marginBottom: 8,
-  alignItems: 'center',
+  alignItems: 'start',
 }
 
 const smallBtn = {
@@ -136,15 +133,20 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
   const [displayStatus, setDisplayStatus] = useState('ACTIVE')
   const [status, setStatus] = useState('')
   const [originalStatus, setOriginalStatus] = useState('')
-  const [copyState, setCopyState] = useState('idle') // 'idle' | 'copied' | 'error'
+  const [copyState, setCopyState] = useState('idle')
+  /** 매핑 완료된 raw_name 집합 — 미매핑 재료 강조 표시용 */
+  const [mappedNames, setMappedNames] = useState(null)
 
   const load = useCallback(async () => {
     if (recipeId == null) return
     setLoading(true)
     setError('')
     try {
-      const res = await adminClient.get(`/api/v1/admin/recipes/${recipeId}`)
-      const d = res.data || {}
+      const [recipeRes, mappedRes] = await Promise.all([
+        adminClient.get(`/api/v1/admin/recipes/${recipeId}`),
+        adminClient.get('/api/v1/admin/ingredients/mapped-names'),
+      ])
+      const d = recipeRes.data || {}
       setDetail(d)
       setTitle(d.title ?? '')
       setYoutubeUrl(d.youtubeUrl ?? '')
@@ -153,6 +155,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
       const initialStatus = d.status ?? ''
       setStatus(initialStatus)
       setOriginalStatus(initialStatus)
+      setMappedNames(new Set(mappedRes.data || []))
     } catch (e) {
       setError('레시피 정보를 불러오지 못했습니다.')
     } finally {
@@ -236,6 +239,17 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
     }
   }
 
+  /** 재료명이 매핑 목록에 없으면 true */
+  const isUnmapped = (name) => {
+    const trimmed = (name || '').replace(/\s/g, '')
+    if (!trimmed || mappedNames == null) return false
+    return !mappedNames.has(trimmed)
+  }
+
+  const unmappedCount = mappedNames == null
+    ? 0
+    : ingredients.filter((it) => isUnmapped(it.name)).length
+
   return (
     <div style={{ ...overlay, zIndex: zIndexProp ?? 9999 }} onClick={onClose}>
       <div style={card} onClick={(e) => e.stopPropagation()}>
@@ -245,7 +259,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
           <div>
             <div style={{ fontSize: '0.8rem', color: '#a1a1aa' }}>레시피 수정 (ID #{recipeId})</div>
             <div style={{ fontWeight: 'bold', color: '#fff', marginTop: 2 }}>
-              {detail?.videoId ? `videoId: ${detail.videoId}` : ' '}
+              {detail?.videoId ? `videoId: ${detail.videoId}` : ' '}
             </div>
           </div>
           <button type="button" onClick={onClose} style={{ ...smallBtn, padding: '6px 12px' }}>
@@ -253,7 +267,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
           </button>
         </div>
 
-        {/* ── 상단 고정 필드 (제목 · 상태 · 유튜브링크) ── */}
+        {/* ── 상단 고정 필드 ── */}
         <div style={topSection}>
           {error && (
             <div style={{ color: '#f87171', padding: 10, background: '#2a1515', borderRadius: 8 }}>
@@ -273,9 +287,8 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
             />
           </div>
 
-          {/* 노출 상태 + 파이프라인 상태: 한 행으로 */}
+          {/* 노출 상태 + 파이프라인 상태 */}
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            {/* displayStatus */}
             <div style={{ flex: '0 0 auto' }}>
               <label style={labelStyle}>노출 상태 (displayStatus)</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -314,7 +327,6 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
               </div>
             </div>
 
-            {/* status */}
             <div style={{ flex: 1, minWidth: 220 }}>
               <label style={labelStyle}>
                 파이프라인 상태 (status){' '}
@@ -371,13 +383,11 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
                 style={{ ...inputStyle, flex: 1, minWidth: 0, background: '#0a0a0a', color: '#9ca3af', cursor: 'not-allowed', borderColor: '#2a2a2a' }}
                 value={youtubeUrl}
                 placeholder="https://www.youtube.com/watch?v=..."
-                title="유튜브 링크는 원본 데이터 보존을 위해 수정할 수 없습니다."
               />
               <button
                 type="button"
                 onClick={handleOpenYoutube}
                 disabled={!youtubeUrl}
-                title="새 탭에서 유튜브 영상 열기"
                 style={{
                   padding: '0 12px',
                   borderRadius: 8,
@@ -398,7 +408,6 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
                 type="button"
                 onClick={handleCopyYoutube}
                 disabled={!youtubeUrl}
-                title="유튜브 링크 클립보드에 복사"
                 style={{
                   padding: '0 12px',
                   borderRadius: 8,
@@ -429,7 +438,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
         ) : (
           <div style={splitRow}>
 
-            {/* 왼쪽: 자막 (읽기 전용) */}
+            {/* 왼쪽: 자막 */}
             <div style={leftPanel}>
               <div style={panelHeader}>
                 <span>자막 (transcript) — 읽기 전용</span>
@@ -456,7 +465,23 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
             {/* 오른쪽: 재료 목록 */}
             <div style={rightPanel}>
               <div style={panelHeader}>
-                <span>재료 ({ingredients.length})</span>
+                <span>
+                  재료 ({ingredients.length})
+                  {unmappedCount > 0 && (
+                    <span style={{
+                      marginLeft: 8,
+                      padding: '1px 7px',
+                      borderRadius: 999,
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      background: '#3f1d1d',
+                      color: '#fca5a5',
+                      border: '1px solid #7f1d1d',
+                    }}>
+                      ⚠ 미매핑 {unmappedCount}개
+                    </span>
+                  )}
+                </span>
                 <button type="button" onClick={addIng} style={{ ...smallBtn, fontSize: '0.75rem', padding: '3px 9px' }}>
                   + 재료 추가
                 </button>
@@ -467,31 +492,55 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
                     재료가 없습니다. [+ 재료 추가]를 눌러 추가하세요.
                   </div>
                 ) : (
-                  ingredients.map((it, idx) => (
-                    <div key={idx} style={ingRow}>
-                      <input
-                        type="text"
-                        value={it.name}
-                        onChange={(e) => updateIng(idx, 'name', e.target.value)}
-                        placeholder="재료 이름 (예: 스팸)"
-                        style={inputStyle}
-                      />
-                      <input
-                        type="text"
-                        value={it.amount}
-                        onChange={(e) => updateIng(idx, 'amount', e.target.value)}
-                        placeholder="분량 (예: 1캔)"
-                        style={inputStyle}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeIng(idx)}
-                        style={{ ...smallBtn, borderColor: '#7f1d1d', color: '#fecaca', background: '#1a0e0e' }}
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  ))
+                  ingredients.map((it, idx) => {
+                    const unmapped = isUnmapped(it.name)
+                    return (
+                      <div key={idx} style={{ marginBottom: 10 }}>
+                        <div style={ingRow}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <input
+                              type="text"
+                              value={it.name}
+                              onChange={(e) => updateIng(idx, 'name', e.target.value)}
+                              placeholder="재료 이름 (예: 스팸)"
+                              style={{
+                                ...inputStyle,
+                                borderColor: unmapped ? '#b91c1c' : '#3f3f46',
+                              }}
+                            />
+                            {unmapped && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: '#f87171' }}>
+                                <span>⚠</span>
+                                <span>ingredient_mapping에 없는 재료</span>
+                              </div>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={it.amount}
+                            onChange={(e) => updateIng(idx, 'amount', e.target.value)}
+                            placeholder="분량 (예: 1캔)"
+                            style={inputStyle}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeIng(idx)}
+                            style={{
+                              ...smallBtn,
+                              borderColor: '#7f1d1d',
+                              color: '#fecaca',
+                              background: '#1a0e0e',
+                              alignSelf: 'flex-start',
+                              paddingTop: 9,
+                              paddingBottom: 9,
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
                 <div style={{ marginTop: 12, fontSize: '0.73rem', color: '#4b5563' }}>
                   저장 시 서버에서 재료 이름의 공백을 제거합니다.
