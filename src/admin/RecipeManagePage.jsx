@@ -5,7 +5,7 @@ import RecipeEditModal from './RecipeEditModal'
 const th = { textAlign: 'left', padding: '12px 10px', borderBottom: '1px solid #333', color: '#9ca3af', fontSize: '0.8rem' }
 const td = { padding: '12px 10px', borderBottom: '1px solid #222', fontSize: '0.9rem' }
 
-const SORT_KEYS = ['id', 'displayStatus', 'status', 'youtuberName']
+const SORT_KEYS = ['id', 'title', 'displayStatus', 'status', 'youtuberName', 'updatedAt']
 
 const STATUS_OPTIONS = ['', 'SUCCESS', 'PENDING', 'NO_SUBTITLES', 'FAILED', 'SKIP']
 
@@ -14,12 +14,30 @@ function SortIcon({ active, dir }) {
   return <span style={{ color: '#60a5fa', marginLeft: 4 }}>{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
+function toTimestamp(val) {
+  if (!val) return 0
+  if (Array.isArray(val)) return new Date(val[0], val[1] - 1, val[2], val[3] ?? 0, val[4] ?? 0, val[5] ?? 0).getTime()
+  return new Date(val).getTime()
+}
+
+function formatDate(val) {
+  if (!val) return '—'
+  const d = Array.isArray(val)
+    ? new Date(val[0], val[1] - 1, val[2], val[3] ?? 0, val[4] ?? 0, val[5] ?? 0)
+    : new Date(val)
+  if (isNaN(d)) return '—'
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function sortValue(row, key) {
   switch (key) {
     case 'id': return row.id ?? 0
+    case 'title': return (row.title ?? '').toLowerCase()
     case 'displayStatus': return row.displayStatus === 'ACTIVE' ? 0 : 1
     case 'status': return row.status ?? 'zzz'
     case 'youtuberName': return (row.youtuberName ?? '').toLowerCase()
+    case 'updatedAt': return toTimestamp(row.updatedAt)
     default: return ''
   }
 }
@@ -94,7 +112,7 @@ export default function RecipeManagePage() {
     return result
   }, [rows, searchQuery, filterDisplay, filterStatus, filterYoutuber, sortKey, sortDir])
 
-  const colLabel = { id: 'ID', displayStatus: '노출', status: '파이프라인', youtuberName: '유튜버' }
+  const colLabel = { id: 'ID', title: '요리명', displayStatus: '노출', status: '파이프라인', youtuberName: '유튜버', updatedAt: '수정일' }
 
   const thBtn = (key) => ({
     background: 'none',
@@ -227,7 +245,7 @@ export default function RecipeManagePage() {
             <tbody>
               {displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ ...td, textAlign: 'center', color: '#666' }}>
+                  <td colSpan={8} style={{ ...td, textAlign: 'center', color: '#666' }}>
                     {hasFilter || searchQuery ? '검색/필터 결과가 없습니다.' : '행이 없습니다.'}
                   </td>
                 </tr>
@@ -237,6 +255,9 @@ export default function RecipeManagePage() {
                   return (
                     <tr key={r.id} style={isHidden ? { opacity: 0.55 } : undefined}>
                       <td style={td}>{r.id}</td>
+                      <td style={{ ...td, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.title ?? '—'}
+                      </td>
                       <td style={td}>
                         <span
                           style={{
@@ -257,6 +278,9 @@ export default function RecipeManagePage() {
                         <StatusBadge status={r.status} />
                       </td>
                       <td style={td}>{r.youtuberName ?? '—'}</td>
+                      <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.78rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                        {formatDate(r.updatedAt)}
+                      </td>
                       <td style={{ ...td, fontFamily: 'monospace', fontSize: '0.8rem' }}>{r.videoId ?? '—'}</td>
                       <td style={{ ...td, textAlign: 'right' }}>
                         <button
