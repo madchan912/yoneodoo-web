@@ -14,20 +14,28 @@ function SortIcon({ active, dir }) {
   return <span style={{ color: '#60a5fa', marginLeft: 4 }}>{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
+// LocalDateTime은 timezone 정보 없이 직렬화되므로 UTC로 간주하고 파싱
+function parseUtc(val) {
+  if (Array.isArray(val)) {
+    return new Date(Date.UTC(val[0], val[1] - 1, val[2], val[3] ?? 0, val[4] ?? 0, val[5] ?? 0))
+  }
+  const s = String(val)
+  return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z')
+}
+
 function toTimestamp(val) {
   if (!val) return 0
-  if (Array.isArray(val)) return new Date(val[0], val[1] - 1, val[2], val[3] ?? 0, val[4] ?? 0, val[5] ?? 0).getTime()
-  return new Date(val).getTime()
+  return parseUtc(val).getTime()
 }
 
 function formatDate(val) {
   if (!val) return '—'
-  const d = Array.isArray(val)
-    ? new Date(val[0], val[1] - 1, val[2], val[3] ?? 0, val[4] ?? 0, val[5] ?? 0)
-    : new Date(val)
-  if (isNaN(d)) return '—'
+  const utc = parseUtc(val)
+  if (isNaN(utc)) return '—'
+  // UTC → KST (+9h)
+  const kst = new Date(utc.getTime() + 9 * 60 * 60 * 1000)
   const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${kst.getUTCFullYear()}.${pad(kst.getUTCMonth() + 1)}.${pad(kst.getUTCDate())} ${pad(kst.getUTCHours())}:${pad(kst.getUTCMinutes())}`
 }
 
 function sortValue(row, key) {
