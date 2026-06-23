@@ -168,17 +168,6 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
       return
     }
 
-    let effectiveDisplayStatus = displayStatus
-    if (status === 'SUCCESS' && displayStatus === 'HIDDEN') {
-      const confirmed = window.confirm(
-        'status를 SUCCESS로 변경했습니다. 노출 상태도 ACTIVE로 변경할까요?',
-      )
-      if (confirmed) {
-        effectiveDisplayStatus = 'ACTIVE'
-        setDisplayStatus('ACTIVE')
-      }
-    }
-
     setSaving(true)
     try {
       const cleaned = ingredients
@@ -188,7 +177,7 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
         title: title.trim(),
         youtubeUrl: youtubeUrl.trim(),
         ingredients: cleaned,
-        displayStatus: effectiveDisplayStatus,
+        displayStatus: displayStatus,
         status: status === '' ? null : status,
       })
       if (typeof onSaved === 'function') onSaved(res.data)
