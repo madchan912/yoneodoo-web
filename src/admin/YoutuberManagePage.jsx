@@ -54,7 +54,8 @@ export default function YoutuberManagePage() {
   // 크롤링 트리거
   const [crawlYoutuber, setCrawlYoutuber] = useState(null)
   const [crawlStart, setCrawlStart] = useState(1)
-  const [crawlEnd, setCrawlEnd] = useState(5)
+  const [crawlEnd, setCrawlEnd] = useState('')
+  const [channelTotal, setChannelTotal] = useState(null) // null=조회중, number=완료
   const [crawling, setCrawling] = useState(false)
   const [activeJob, setActiveJob] = useState(null) // { jobId, status, processed, total, results }
   const pollRef = useRef(null)
@@ -119,6 +120,27 @@ export default function YoutuberManagePage() {
       await load()
     } catch (err) {
       alert('삭제 실패: ' + (err.response?.data?.message || err.message))
+    }
+  }
+
+  // 크롤링 버튼 클릭 → 패널 열기 + 채널 영상 수 조회
+  async function handleOpenCrawl(y) {
+    setCrawlYoutuber(y)
+    setCrawlStart(1)
+    setCrawlEnd('')
+    setChannelTotal(null)
+    clearInterval(pollRef.current)
+    setActiveJob(null)
+    try {
+      const res = await adminClient.get('/api/v1/admin/channel-info', {
+        params: { channelUrl: y.channelUrl },
+      })
+      const total = res.data.total_videos ?? 0
+      setChannelTotal(total)
+      setCrawlEnd(total)
+    } catch {
+      setChannelTotal(0)
+      setCrawlEnd(50)
     }
   }
 
@@ -246,7 +268,7 @@ export default function YoutuberManagePage() {
                         {y.active ? '비활성화' : '활성화'}
                       </button>
                       <button
-                        onClick={() => { setCrawlYoutuber(y); setCrawlStart(1); setCrawlEnd(5) }}
+                        onClick={() => handleOpenCrawl(y)}
                         style={{ ...btnBase, backgroundColor: '#1e3a5f', color: '#93c5fd', marginRight: 6 }}
                       >
                         크롤링
@@ -269,8 +291,11 @@ export default function YoutuberManagePage() {
       {/* ─── 크롤링 트리거 ─── */}
       {crawlYoutuber && (
         <section style={{ marginBottom: 28, padding: '16px 20px', backgroundColor: '#1a2740', borderRadius: 10, border: '1px solid #2563eb' }}>
-          <div style={{ fontWeight: 700, color: '#93c5fd', marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, color: '#93c5fd', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
             크롤링 트리거 — {crawlYoutuber.youtuberName}
+            <span style={{ fontSize: '0.8rem', fontWeight: 400, color: channelTotal === null ? '#6b7280' : '#34d399' }}>
+              {channelTotal === null ? '전체 영상 조회 중…' : `전체 영상: ${channelTotal}개`}
+            </span>
           </div>
           <form onSubmit={handleCrawl} style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -298,7 +323,7 @@ export default function YoutuberManagePage() {
             </button>
             <button
               type="button"
-              onClick={() => { setCrawlYoutuber(null); setActiveJob(null); clearInterval(pollRef.current); setCrawling(false) }}
+              onClick={() => { setCrawlYoutuber(null); setActiveJob(null); setChannelTotal(null); clearInterval(pollRef.current); setCrawling(false) }}
               style={{ ...btnBase, backgroundColor: '#374151', color: '#d1d5db' }}
             >
               취소
