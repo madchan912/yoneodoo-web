@@ -4,6 +4,7 @@ import { adminClient } from '../api/adminClient'
 import AdminLoginPage from './AdminLoginPage'
 import RecipeManagePage from './RecipeManagePage'
 import IngredientMappingPage from './IngredientMappingPage'
+import YoutuberManagePage from './YoutuberManagePage'
 import { clearAdminSecret, getAdminSecret } from './adminSession'
 
 function AdminIndexGate() {
@@ -55,6 +56,9 @@ function AdminShell() {
           </NavLink>
           <NavLink to="/admin/ingredients" style={({ isActive }) => ({ ...linkBase, ...(isActive ? linkActive : {}) })}>
             재료 정규화 매핑
+          </NavLink>
+          <NavLink to="/admin/youtubers" style={({ isActive }) => ({ ...linkBase, ...(isActive ? linkActive : {}) })}>
+            유튜버 관리
           </NavLink>
         </nav>
         <div style={{ marginTop: 28, paddingLeft: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -116,6 +120,7 @@ export default function AdminRoutes() {
         <Route element={<AdminShell />}>
           <Route path="recipes" element={<RecipeManagePage />} />
           <Route path="ingredients" element={<IngredientMappingPage />} />
+          <Route path="youtubers" element={<YoutuberManagePage />} />
         </Route>
       </Route>
     </Routes>
