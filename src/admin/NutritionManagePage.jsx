@@ -268,7 +268,7 @@ export default function NutritionManagePage() {
                     key={r.id}
                     onClick={() => applySearchResult(r)}
                     style={{
-                      padding: '8px 12px',
+                      padding: '9px 12px',
                       cursor: 'pointer',
                       borderBottom: '1px solid #1e1e1e',
                       fontSize: '0.82rem',
@@ -277,9 +277,16 @@ export default function NutritionManagePage() {
                     onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e3a5f')}
                     onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                   >
-                    <span style={{ color: '#fff' }}>{r.foodName}</span>
-                    {r.foodGroup && <span style={{ color: '#666', marginLeft: 8 }}>{r.foodGroup}</span>}
-                    <span style={{ marginLeft: 8, color: '#f59e0b' }}>{r.calories != null ? `${r.calories} kcal` : '-'}</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ color: '#fff' }}>{r.foodName}</span>
+                      {r.foodGroup && <span style={{ color: '#555', fontSize: '0.75rem' }}>{r.foodGroup}</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 2, fontSize: '0.75rem', color: '#888' }}>
+                      <span style={{ color: '#f59e0b' }}>{r.calories != null ? `${r.calories}kcal` : '-'}</span>
+                      <span>단백질 {r.protein != null ? `${r.protein}g` : '-'}</span>
+                      <span>나트륨 {r.sodium != null ? `${Number(r.sodium).toLocaleString()}mg` : '-'}</span>
+                      {r.sourceVer && <span style={{ color: '#3b82f6' }}>[ver {r.sourceVer}]</span>}
+                    </div>
                   </div>
                 ))}
               </div>
