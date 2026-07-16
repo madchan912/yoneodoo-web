@@ -56,7 +56,9 @@ const emptyForm = () => Object.fromEntries(FIELDS.map((f) => [f.key, '']))
 
 export default function NutritionManagePage() {
   const [stats, setStats] = useState(null)
+  const [tab, setTab] = useState('unmatched')
   const [unmatched, setUnmatched] = useState([])
+  const [matched, setMatched] = useState([])
   const [selected, setSelected] = useState(null)
 
   const [keyword, setKeyword] = useState('')
@@ -80,16 +82,47 @@ export default function NutritionManagePage() {
     setUnmatched(res.data)
   }, [])
 
+  const loadMatched = useCallback(async () => {
+    const res = await adminClient.get('/api/v1/admin/nutrition/matched')
+    setMatched(res.data)
+  }, [])
+
   useEffect(() => {
     loadStats()
     loadUnmatched()
-  }, [loadStats, loadUnmatched])
+    loadMatched()
+  }, [loadStats, loadUnmatched, loadMatched])
+
+  const SOURCE_COLOR = {
+    foodsafety_kr: '#22c55e',
+    manual:        '#3b82f6',
+    gemini_est:    '#f59e0b',
+    manual_needed: '#6b7280',
+  }
 
   const selectItem = (item) => {
     setSelected(item)
     setSearchResults([])
     setKeyword('')
     setForm(emptyForm())
+    setError('')
+    setSavedName(null)
+    setTimeout(() => searchRef.current?.focus(), 50)
+  }
+
+  const selectMatchedItem = (item) => {
+    setSelected({ id: item.id, masterName: item.masterName, source: item.source })
+    setSearchResults([])
+    setKeyword('')
+    setForm({
+      calories:     item.calories     ?? '',
+      protein:      item.protein      ?? '',
+      fat:          item.fat          ?? '',
+      saturatedFat: item.saturatedFat ?? '',
+      carbohydrate: item.carbohydrate ?? '',
+      sugar:        item.sugar        ?? '',
+      sodium:       item.sodium       ?? '',
+    })
     setError('')
     setSavedName(null)
     setTimeout(() => searchRef.current?.focus(), 50)
@@ -137,7 +170,7 @@ export default function NutritionManagePage() {
       }
       await adminClient.put(`/api/v1/admin/nutrition/${encodeURIComponent(selected.masterName)}`, body)
       setSavedName(selected.masterName)
-      await Promise.all([loadStats(), loadUnmatched()])
+      await Promise.all([loadStats(), loadUnmatched(), loadMatched()])
       setSelected(null)
       setForm(emptyForm())
       setKeyword('')
@@ -174,34 +207,107 @@ export default function NutritionManagePage() {
           </div>
         )}
 
-        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: 4 }}>
-          수동 입력 필요 ({unmatched.length})
+        {/* 탭 */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {[
+            { key: 'unmatched', label: `미매칭 ${unmatched.length}개` },
+            { key: 'matched',   label: `완료 ${matched.length}개` },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              style={{
+                flex: 1,
+                padding: '6px 0',
+                borderRadius: 6,
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: tab === key ? 'bold' : 'normal',
+                backgroundColor: tab === key ? '#1e3a5f' : '#2a2a2a',
+                color: tab === key ? '#fff' : '#888',
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         <div style={scrollList}>
-          {unmatched.length === 0 && (
-            <div style={{ color: '#22c55e', textAlign: 'center', marginTop: 24, fontSize: '0.85rem' }}>
-              모두 완료되었습니다 ✓
-            </div>
+          {/* 미매칭 탭 */}
+          {tab === 'unmatched' && (
+            <>
+              {unmatched.length === 0 && (
+                <div style={{ color: '#22c55e', textAlign: 'center', marginTop: 24, fontSize: '0.85rem' }}>
+                  모두 완료되었습니다 ✓
+                </div>
+              )}
+              {unmatched.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => selectItem(item)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    marginBottom: 3,
+                    backgroundColor: selected?.id === item.id ? '#1e3a5f' : 'transparent',
+                    color: selected?.id === item.id ? '#fff' : '#ccc',
+                    fontSize: '0.85rem',
+                    border: selected?.id === item.id ? '1px solid #3b82f6' : '1px solid transparent',
+                  }}
+                >
+                  {item.masterName}
+                </div>
+              ))}
+            </>
           )}
-          {unmatched.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => selectItem(item)}
-              style={{
-                padding: '8px 10px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                marginBottom: 3,
-                backgroundColor: selected?.id === item.id ? '#1e3a5f' : 'transparent',
-                color: selected?.id === item.id ? '#fff' : '#ccc',
-                fontSize: '0.85rem',
-                border: selected?.id === item.id ? '1px solid #3b82f6' : '1px solid transparent',
-              }}
-            >
-              {item.masterName}
-            </div>
-          ))}
+
+          {/* 완료 탭 */}
+          {tab === 'matched' && (
+            <>
+              {matched.length === 0 && (
+                <div style={{ color: '#888', textAlign: 'center', marginTop: 24, fontSize: '0.85rem' }}>
+                  완료된 항목이 없습니다
+                </div>
+              )}
+              {matched.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => selectMatchedItem(item)}
+                  style={{
+                    padding: '7px 10px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    marginBottom: 3,
+                    backgroundColor: selected?.id === item.id ? '#1e3a5f' : 'transparent',
+                    color: selected?.id === item.id ? '#fff' : '#ccc',
+                    fontSize: '0.83rem',
+                    border: selected?.id === item.id ? '1px solid #3b82f6' : '1px solid transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>{item.masterName}</span>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      padding: '1px 5px',
+                      borderRadius: 3,
+                      backgroundColor: (SOURCE_COLOR[item.source] ?? '#6b7280') + '22',
+                      color: SOURCE_COLOR[item.source] ?? '#6b7280',
+                      fontWeight: 'bold',
+                      flexShrink: 0,
+                      marginLeft: 6,
+                    }}>
+                      {item.source === 'foodsafety_kr' ? '식품DB' : item.source === 'gemini_est' ? 'AI' : '수동'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#666', marginTop: 1 }}>
+                    {item.calories != null ? `${item.calories}kcal` : '—'}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -221,7 +327,9 @@ export default function NutritionManagePage() {
             {/* 선택된 재료명 헤더 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: '1.05rem', fontWeight: 'bold', color: '#fff' }}>{selected.masterName}</span>
-              <span style={tag('#f59e0b')}>manual_needed</span>
+              <span style={tag(SOURCE_COLOR[selected.source] ?? '#6b7280')}>
+                {selected.source ?? 'manual_needed'}
+              </span>
               <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#666' }}>기준: 100g</span>
             </div>
 
