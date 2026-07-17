@@ -7,7 +7,17 @@ const td = { padding: '12px 10px', borderBottom: '1px solid #222', fontSize: '0.
 
 const SORT_KEYS = ['id', 'title', 'displayStatus', 'status', 'youtuberName', 'updatedAt']
 
-const STATUS_OPTIONS = ['', 'SUCCESS', 'PENDING', 'NO_SUBTITLES', 'AI_ERROR']
+const STATUS_OPTIONS = ['', 'SUCCESS', 'INCOMPLETE', 'UNMATCHED', 'NO_SUBTITLES', 'AI_ERROR']
+
+const STATUS_LABEL = {
+  SUCCESS: '완료',
+  INCOMPLETE: '수량 입력 필요',
+  UNMATCHED: '정규화 필요',
+  NO_SUBTITLES: '자막 없음',
+  FAILED: '실패',
+  SKIP: '요리 아님',
+  AI_ERROR: 'AI 오류',
+}
 
 function SortIcon({ active, dir }) {
   if (!active) return <span style={{ color: '#444', marginLeft: 4 }}>↕</span>
@@ -184,7 +194,9 @@ export default function RecipeManagePage() {
           style={selectStyle(filterStatus !== '')}
         >
           {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s === '' ? '파이프라인 전체' : s}</option>
+            <option key={s} value={s}>
+              {s === '' ? '파이프라인 전체' : `${s}${STATUS_LABEL[s] ? ' — ' + STATUS_LABEL[s] : ''}`}
+            </option>
           ))}
         </select>
 
@@ -331,10 +343,13 @@ export default function RecipeManagePage() {
 function StatusBadge({ status }) {
   if (!status) return <span style={{ color: '#525252' }}>—</span>
   const colors = {
-    SUCCESS: { bg: '#14532d', color: '#86efac', border: '#166534' },
-    PENDING: { bg: '#1c1a00', color: '#fde68a', border: '#713f12' },
+    SUCCESS:      { bg: '#14532d', color: '#86efac', border: '#166534' },
+    INCOMPLETE:   { bg: '#1c1a00', color: '#fde68a', border: '#713f12' },
+    UNMATCHED:    { bg: '#1a1200', color: '#fbbf24', border: '#92400e' },
     NO_SUBTITLES: { bg: '#3f1212', color: '#fca5a5', border: '#7f1d1d' },
-    AI_ERROR: { bg: '#2d1b4e', color: '#d8b4fe', border: '#6b21a8' },
+    FAILED:       { bg: '#3f1212', color: '#fca5a5', border: '#7f1d1d' },
+    SKIP:         { bg: '#1c1c1c', color: '#6b7280', border: '#3f3f46' },
+    AI_ERROR:     { bg: '#2d1b4e', color: '#d8b4fe', border: '#6b21a8' },
   }
   const c = colors[status] ?? { bg: '#1c1c1c', color: '#a1a1aa', border: '#3f3f46' }
   return (
@@ -348,7 +363,7 @@ function StatusBadge({ status }) {
       color: c.color,
       border: `1px solid ${c.border}`,
     }}>
-      {status}
+      {STATUS_LABEL[status] ?? status}
     </span>
   )
 }

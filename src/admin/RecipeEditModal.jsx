@@ -360,10 +360,12 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
                 style={{ ...inputStyle, cursor: 'pointer' }}
               >
                 <option value="">(변경 없음 — 기존 값 유지)</option>
-                <option value="SUCCESS">SUCCESS — 정상 처리</option>
+                <option value="SUCCESS">SUCCESS — 완료</option>
+                <option value="INCOMPLETE">INCOMPLETE — 수량 입력 필요</option>
+                <option value="UNMATCHED">UNMATCHED — 정규화 필요</option>
                 <option value="NO_SUBTITLES">NO_SUBTITLES — 자막 없음</option>
-                <option value="PENDING">PENDING — 처리 대기</option>
-                <option value="FAILED">FAILED — 처리 실패</option>
+                <option value="FAILED">FAILED — 실패</option>
+                <option value="SKIP">SKIP — 요리 아님</option>
               </select>
               {status && status !== originalStatus && (
                 <div style={{ marginTop: 4, fontSize: '0.73rem', color: '#fcd34d' }}>
