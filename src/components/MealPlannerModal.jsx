@@ -114,7 +114,7 @@ export default function MealPlannerModal({ onClose }) {
             <div style={{ backgroundColor: '#121212', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #333' }}>
               <div style={{ color: '#a78bfa', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '10px' }}>📋 AI 추천 식단</div>
               <div style={{ color: '#e0e0e0', fontSize: '0.95rem', lineHeight: '1.8', whiteSpace: 'pre-line' }}>
-                {result.mealPlan}
+                {result.mealPlan.replace(/\*\*/g, '')}
               </div>
             </div>
 
