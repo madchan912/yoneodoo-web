@@ -28,6 +28,7 @@ function App() {
   })
   const [isFridgeOpen, setIsFridgeOpen] = useState(false)
   const [isMealPlannerOpen, setIsMealPlannerOpen] = useState(false)
+  const isBeta = new URLSearchParams(window.location.search).get('beta') === 'true'
   const [fridgeSearchTerm, setFridgeSearchTerm] = useState('')
   const [fridgeSuggestions, setFridgeSuggestions] = useState([])
   const [fridgeSelectedIndex, setFridgeSelectedIndex] = useState(-1) 
@@ -346,12 +347,14 @@ function App() {
     <div style={{ padding: '30px 20px', fontFamily: 'sans-serif', backgroundColor: '#121212', minHeight: '100vh', color: '#e0e0e0', paddingBottom: '100px' }}>
       
       <div style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1000 }}>
-        <button
-          onClick={() => setIsMealPlannerOpen(true)}
-          style={{ backgroundColor: '#7c3aed', color: 'white', border: 'none', borderRadius: '50px', padding: '13px 22px', fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 20px rgba(124, 58, 237, 0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <span style={{ fontSize: '1.3rem' }}>🤖</span> AI 식단
-        </button>
+        {isBeta && (
+          <button
+            onClick={() => setIsMealPlannerOpen(true)}
+            style={{ backgroundColor: '#7c3aed', color: 'white', border: 'none', borderRadius: '50px', padding: '13px 22px', fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 20px rgba(124, 58, 237, 0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <span style={{ fontSize: '1.3rem' }}>🤖</span> AI 식단
+          </button>
+        )}
         <button
           onClick={() => setIsFridgeOpen(true)}
           style={{ backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '50px', padding: '15px 25px', fontSize: '1.1rem', fontWeight: 'bold', boxShadow: '0 10px 25px rgba(16, 185, 129, 0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
