@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { getApiBaseUrl } from './config/apiBase'
+import MealPlannerModal from './components/MealPlannerModal'
 
 function App() {
   const [recipes, setRecipes] = useState([])
@@ -26,6 +27,7 @@ function App() {
     return saved ? JSON.parse(saved) : []
   })
   const [isFridgeOpen, setIsFridgeOpen] = useState(false)
+  const [isMealPlannerOpen, setIsMealPlannerOpen] = useState(false)
   const [fridgeSearchTerm, setFridgeSearchTerm] = useState('')
   const [fridgeSuggestions, setFridgeSuggestions] = useState([])
   const [fridgeSelectedIndex, setFridgeSelectedIndex] = useState(-1) 
@@ -206,12 +208,12 @@ function App() {
   }
 
   useEffect(() => {
-    if (selectedVideo || ingredientsModalRecipe || isFridgeOpen || finishedRecipe) {
+    if (selectedVideo || ingredientsModalRecipe || isFridgeOpen || finishedRecipe || isMealPlannerOpen) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'unset'
     }
-  }, [selectedVideo, ingredientsModalRecipe, isFridgeOpen, finishedRecipe])
+  }, [selectedVideo, ingredientsModalRecipe, isFridgeOpen, finishedRecipe, isMealPlannerOpen])
 
   const getSortedIngredients = (ingredientsList, compareArray) => {
     return [...ingredientsList].sort((a, b) => {
@@ -343,9 +345,20 @@ function App() {
   return (
     <div style={{ padding: '30px 20px', fontFamily: 'sans-serif', backgroundColor: '#121212', minHeight: '100vh', color: '#e0e0e0', paddingBottom: '100px' }}>
       
-      <button onClick={() => setIsFridgeOpen(true)} style={{ position: 'fixed', bottom: '30px', right: '30px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '50px', padding: '15px 25px', fontSize: '1.1rem', fontWeight: 'bold', boxShadow: '0 10px 25px rgba(16, 185, 129, 0.5)', cursor: 'pointer', zIndex: 1000, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontSize: '1.4rem' }}>🧊</span> 내 냉장고 ({myFridge.length})
-      </button>
+      <div style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', flexDirection: 'column', gap: '12px', zIndex: 1000 }}>
+        <button
+          onClick={() => setIsMealPlannerOpen(true)}
+          style={{ backgroundColor: '#7c3aed', color: 'white', border: 'none', borderRadius: '50px', padding: '13px 22px', fontSize: '1rem', fontWeight: 'bold', boxShadow: '0 8px 20px rgba(124, 58, 237, 0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <span style={{ fontSize: '1.3rem' }}>🤖</span> AI 식단
+        </button>
+        <button
+          onClick={() => setIsFridgeOpen(true)}
+          style={{ backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '50px', padding: '15px 25px', fontSize: '1.1rem', fontWeight: 'bold', boxShadow: '0 10px 25px rgba(16, 185, 129, 0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <span style={{ fontSize: '1.4rem' }}>🧊</span> 내 냉장고 ({myFridge.length})
+        </button>
+      </div>
 
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <div style={{ color: '#3b82f6', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '8px' }}>요리? 너도 할 수 있어!</div>
@@ -498,6 +511,8 @@ function App() {
       <footer style={{ textAlign: 'center', marginTop: 48, paddingBottom: 16, color: '#3a3a3a', fontSize: '0.75rem' }}>
         © 2026 요너두. All rights reserved.
       </footer>
+
+      {isMealPlannerOpen && <MealPlannerModal onClose={() => setIsMealPlannerOpen(false)} />}
 
       {isFridgeOpen && (
         <div onClick={() => setIsFridgeOpen(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' }}>
