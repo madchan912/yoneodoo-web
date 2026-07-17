@@ -54,10 +54,24 @@ const FIELDS = [
 
 const emptyForm = () => Object.fromEntries(FIELDS.map((f) => [f.key, '']))
 
+const SOURCE_COLOR = {
+  foodsafety_kr: '#22c55e',
+  manual:        '#3b82f6',
+  gemini_est:    '#f59e0b',
+  manual_needed: '#ef4444',
+}
+
+const TABS = [
+  { key: 'unmatched',     label: (n) => `미매칭 ${n}개` },
+  { key: 'manual_needed', label: (n) => `확인필요 ${n}개` },
+  { key: 'matched',       label: (n) => `완료 ${n}개` },
+]
+
 export default function NutritionManagePage() {
   const [stats, setStats] = useState(null)
   const [tab, setTab] = useState('unmatched')
   const [unmatched, setUnmatched] = useState([])
+  const [manualNeeded, setManualNeeded] = useState([])
   const [matched, setMatched] = useState([])
   const [selected, setSelected] = useState(null)
 
@@ -82,23 +96,24 @@ export default function NutritionManagePage() {
     setUnmatched(res.data)
   }, [])
 
+  const loadManualNeeded = useCallback(async () => {
+    const res = await adminClient.get('/api/v1/admin/nutrition/manual-needed')
+    setManualNeeded(res.data)
+  }, [])
+
   const loadMatched = useCallback(async () => {
     const res = await adminClient.get('/api/v1/admin/nutrition/matched')
     setMatched(res.data)
   }, [])
 
-  useEffect(() => {
-    loadStats()
-    loadUnmatched()
-    loadMatched()
-  }, [loadStats, loadUnmatched, loadMatched])
+  const reloadAll = useCallback(
+    () => Promise.all([loadStats(), loadUnmatched(), loadManualNeeded(), loadMatched()]),
+    [loadStats, loadUnmatched, loadManualNeeded, loadMatched],
+  )
 
-  const SOURCE_COLOR = {
-    foodsafety_kr: '#22c55e',
-    manual:        '#3b82f6',
-    gemini_est:    '#f59e0b',
-    manual_needed: '#6b7280',
-  }
+  useEffect(() => {
+    reloadAll()
+  }, [reloadAll])
 
   const selectItem = (item) => {
     setSelected(item)
@@ -145,13 +160,13 @@ export default function NutritionManagePage() {
 
   const applySearchResult = (item) => {
     setForm({
-      calories: item.calories ?? '',
-      protein: item.protein ?? '',
-      fat: item.fat ?? '',
+      calories:     item.calories     ?? '',
+      protein:      item.protein      ?? '',
+      fat:          item.fat          ?? '',
       saturatedFat: item.saturatedFat ?? '',
       carbohydrate: item.carbohydrate ?? '',
-      sugar: item.sugar ?? '',
-      sodium: item.sodium ?? '',
+      sugar:        item.sugar        ?? '',
+      sodium:       item.sodium       ?? '',
     })
     setSearchResults([])
     setKeyword(item.foodName)
@@ -170,7 +185,7 @@ export default function NutritionManagePage() {
       }
       await adminClient.put(`/api/v1/admin/nutrition/${encodeURIComponent(selected.masterName)}`, body)
       setSavedName(selected.masterName)
-      await Promise.all([loadStats(), loadUnmatched(), loadMatched()])
+      await reloadAll()
       setSelected(null)
       setForm(emptyForm())
       setKeyword('')
@@ -182,18 +197,24 @@ export default function NutritionManagePage() {
     }
   }
 
+  const tabCounts = {
+    unmatched:     unmatched.length,
+    manual_needed: manualNeeded.length,
+    matched:       matched.length,
+  }
+
   return (
     <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 170px)' }}>
 
-      {/* 왼쪽: 통계 + 미매칭 목록 */}
+      {/* 왼쪽: 통계 + 목록 */}
       <div style={{ ...panel, width: 300, flexShrink: 0 }}>
 
         {/* 통계 카드 */}
         {stats && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
             {[
-              { label: '전체', value: stats.total, color: '#9ca3af' },
-              { label: '완료', value: stats.matched, color: '#22c55e' },
+              { label: '전체',   value: stats.total,    color: '#9ca3af' },
+              { label: '완료',   value: stats.matched,  color: '#22c55e' },
               { label: '미완료', value: stats.unmatched, color: '#f59e0b' },
             ].map(({ label, value, color }) => (
               <div
@@ -209,26 +230,27 @@ export default function NutritionManagePage() {
 
         {/* 탭 */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-          {[
-            { key: 'unmatched', label: `미매칭 ${unmatched.length}개` },
-            { key: 'matched',   label: `완료 ${matched.length}개` },
-          ].map(({ key, label }) => (
+          {TABS.map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setTab(key)}
+              onClick={() => { setTab(key); setSelected(null); setForm(emptyForm()); setSearchResults([]); setKeyword('') }}
               style={{
                 flex: 1,
                 padding: '6px 0',
                 borderRadius: 6,
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: '0.78rem',
+                fontSize: '0.72rem',
                 fontWeight: tab === key ? 'bold' : 'normal',
-                backgroundColor: tab === key ? '#1e3a5f' : '#2a2a2a',
-                color: tab === key ? '#fff' : '#888',
+                backgroundColor: tab === key
+                  ? (key === 'manual_needed' ? '#3d1a1a' : '#1e3a5f')
+                  : '#2a2a2a',
+                color: tab === key
+                  ? (key === 'manual_needed' ? '#ef4444' : '#fff')
+                  : '#888',
               }}
             >
-              {label}
+              {label(tabCounts[key])}
             </button>
           ))}
         </div>
@@ -258,6 +280,42 @@ export default function NutritionManagePage() {
                   }}
                 >
                   {item.masterName}
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* 확인필요 탭 — Gemini가 영양성분 추정에 실패한 재료 */}
+          {tab === 'manual_needed' && (
+            <>
+              {manualNeeded.length === 0 && (
+                <div style={{ color: '#22c55e', textAlign: 'center', marginTop: 24, fontSize: '0.85rem' }}>
+                  확인 필요 항목이 없습니다 ✓
+                </div>
+              )}
+              <div style={{ fontSize: '0.72rem', color: '#888', marginBottom: 8, lineHeight: 1.4 }}>
+                AI가 영양성분을 추정하지 못한 재료입니다.<br />
+                식품성분표 검색 후 수동으로 입력해 주세요.
+              </div>
+              {manualNeeded.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => selectItem(item)}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    marginBottom: 3,
+                    backgroundColor: selected?.id === item.id ? '#3d1a1a' : 'transparent',
+                    color: selected?.id === item.id ? '#fca5a5' : '#ccc',
+                    fontSize: '0.85rem',
+                    border: selected?.id === item.id ? '1px solid #ef4444' : '1px solid transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>{item.masterName}</span>
+                    <span style={{ fontSize: '0.68rem', color: '#ef4444' }}>수동필요</span>
+                  </div>
                 </div>
               ))}
             </>
@@ -330,6 +388,11 @@ export default function NutritionManagePage() {
               <span style={tag(SOURCE_COLOR[selected.source] ?? '#6b7280')}>
                 {selected.source ?? 'manual_needed'}
               </span>
+              {tab === 'manual_needed' && (
+                <span style={{ fontSize: '0.78rem', color: '#ef4444', marginLeft: 4 }}>
+                  AI 추정 실패 — 수동 입력 필요
+                </span>
+              )}
               <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#666' }}>기준: 100g</span>
             </div>
 
