@@ -136,6 +136,8 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
   const [copyState, setCopyState] = useState('idle')
   /** 매핑 완료된 raw_name 집합 — 미매핑 재료 강조 표시용 */
   const [mappedNames, setMappedNames] = useState(null)
+  /** 아코디언 열린 섹션: 'transcript' | 'description' | 'firstComment' */
+  const [openSection, setOpenSection] = useState('transcript')
 
   const load = useCallback(async () => {
     if (recipeId == null) return
@@ -228,6 +230,8 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
         ingredients: cleaned,
         displayStatus: displayStatus,
         status: status === '' ? null : status,
+        description: detail?.description ?? null,
+        firstComment: detail?.firstComment ?? null,
       })
       if (typeof onSaved === 'function') onSaved(res.data)
       onClose?.()
@@ -440,28 +444,69 @@ export default function RecipeEditModal({ recipeId, onClose, onSaved, zIndex: zI
         ) : (
           <div style={splitRow}>
 
-            {/* 왼쪽: 자막 */}
+            {/* 왼쪽: 자막/더보기/첫댓글 아코디언 */}
             <div style={leftPanel}>
-              <div style={panelHeader}>
-                <span>자막 (transcript) — 읽기 전용</span>
-              </div>
-              <div style={panelScroll}>
-                {detail?.transcript ? (
-                  <pre style={{
-                    margin: 0,
-                    fontFamily: 'monospace',
-                    fontSize: '0.78rem',
-                    lineHeight: 1.7,
-                    color: '#9ca3af',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}>
-                    {detail.transcript}
-                  </pre>
-                ) : (
-                  <div style={{ color: '#4b5563', fontSize: '0.85rem', paddingTop: 8 }}>자막 없음</div>
-                )}
-              </div>
+              {[
+                { key: 'transcript',  label: '자막 (transcript)',     content: detail?.transcript },
+                { key: 'description', label: '더보기 (description)',  content: detail?.description },
+                { key: 'firstComment',label: '첫번째 댓글',           content: detail?.firstComment },
+              ].map(({ key, label, content }) => {
+                const isOpen = openSection === key
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      flexGrow: isOpen ? 1 : 0,
+                      minHeight: 0,
+                      borderBottom: '1px solid #1f1f1f',
+                    }}
+                  >
+                    {/* 섹션 헤더 — 클릭하면 해당 섹션 열기 */}
+                    <button
+                      type="button"
+                      onClick={() => setOpenSection(key)}
+                      style={{
+                        ...panelHeader,
+                        cursor: 'pointer',
+                        border: 'none',
+                        background: isOpen ? '#1a2030' : 'transparent',
+                        color: isOpen ? '#93c5fd' : '#a1a1aa',
+                        textAlign: 'left',
+                        width: '100%',
+                        fontWeight: isOpen ? 'bold' : 'normal',
+                      }}
+                    >
+                      <span>{label}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#555' }}>
+                        {content ? `${content.length}자` : '없음'}
+                      </span>
+                    </button>
+
+                    {/* 섹션 본문 */}
+                    {isOpen && (
+                      <div style={{ ...panelScroll }}>
+                        {content ? (
+                          <pre style={{
+                            margin: 0,
+                            fontFamily: 'monospace',
+                            fontSize: '0.78rem',
+                            lineHeight: 1.7,
+                            color: '#9ca3af',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}>
+                            {content}
+                          </pre>
+                        ) : (
+                          <div style={{ color: '#4b5563', fontSize: '0.85rem', paddingTop: 8 }}>내용 없음</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* 오른쪽: 재료 목록 */}
