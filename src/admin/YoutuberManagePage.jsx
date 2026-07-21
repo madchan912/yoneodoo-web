@@ -60,6 +60,13 @@ export default function YoutuberManagePage() {
   const [activeJob, setActiveJob] = useState(null) // { jobId, status, processed, total, results }
   const pollRef = useRef(null)
 
+  // 수동 배치 실행 (로컬 전용, localhost:8000 FastAPI 직접 호출)
+  const isLocalAdmin = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  const [batchRunning, setBatchRunning] = useState(false)
+  const [batchJob, setBatchJob] = useState(null) // { status, total_youtubers, completed_youtubers, current_youtuber }
+  const [batchError, setBatchError] = useState('')
+  const batchPollRef = useRef(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -79,8 +86,46 @@ export default function YoutuberManagePage() {
 
   useEffect(() => {
     load()
-    return () => clearInterval(pollRef.current)
+    return () => {
+      clearInterval(pollRef.current)
+      clearInterval(batchPollRef.current)
+    }
   }, [load])
+
+  // 전체 배치 실행 — 로컬 FastAPI(localhost:8000)를 직접 호출
+  async function handleRunBatch() {
+    setBatchRunning(true)
+    setBatchError('')
+    setBatchJob(null)
+    clearInterval(batchPollRef.current)
+    try {
+      const res = await fetch('http://localhost:8000/batch/run', { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const jobId = data.job_id
+      setBatchJob({ status: 'pending', total_youtubers: 0, completed_youtubers: 0, current_youtuber: null })
+
+      batchPollRef.current = setInterval(async () => {
+        try {
+          const sr = await fetch(`http://localhost:8000/batch/status/${jobId}`)
+          const d = await sr.json()
+          setBatchJob(d)
+          if (d.status === 'done' || d.status === 'failed' || d.status === 'blocked') {
+            clearInterval(batchPollRef.current)
+            setBatchRunning(false)
+            await load()
+          }
+        } catch {
+          clearInterval(batchPollRef.current)
+          setBatchRunning(false)
+          setBatchError('배치 실패 - 로컬 서버가 실행 중인지 확인하세요')
+        }
+      }, 3000)
+    } catch {
+      setBatchRunning(false)
+      setBatchError('배치 실패 - 로컬 서버가 실행 중인지 확인하세요')
+    }
+  }
 
   // 유튜버 등록
   async function handleAdd(e) {
@@ -192,6 +237,31 @@ export default function YoutuberManagePage() {
       <h2 style={{ color: '#fff', marginBottom: 20, fontSize: '1.1rem' }}>유튜버 관리</h2>
 
       {error && <div style={{ color: '#ef4444', marginBottom: 12 }}>{error}</div>}
+
+      {/* ─── 전체 배치 실행 (로컬 전용) ─── */}
+      {isLocalAdmin && (
+        <section style={{ marginBottom: 20, padding: '14px 20px', backgroundColor: '#1e1e1e', borderRadius: 10, border: '1px solid #333', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <button
+            onClick={handleRunBatch}
+            disabled={batchRunning}
+            style={{ ...btnBase, backgroundColor: batchRunning ? '#374151' : '#065f46', color: '#fff', opacity: batchRunning ? 0.7 : 1 }}
+          >
+            {batchRunning ? '배치 실행 중…' : '전체 배치 실행'}
+          </button>
+
+          {batchJob && (
+            <span style={{ color: '#ddd', fontSize: '0.85rem' }}>
+              {batchJob.status === 'done' && '배치 완료! Discord 알림 전송됨'}
+              {batchJob.status === 'blocked' && `배치 중단 (IP 차단 감지) — ${batchJob.completed_youtubers}/${batchJob.total_youtubers} 유튜버 완료`}
+              {batchJob.status === 'failed' && `배치 실패: ${batchJob.error ?? ''}`}
+              {(batchJob.status === 'running' || batchJob.status === 'pending') &&
+                `${batchJob.completed_youtubers}/${batchJob.total_youtubers} 유튜버 완료${batchJob.current_youtuber ? ` (현재: ${batchJob.current_youtuber})` : ''}`}
+            </span>
+          )}
+
+          {batchError && <span style={{ color: '#ef4444', fontSize: '0.85rem' }}>{batchError}</span>}
+        </section>
+      )}
 
       {/* ─── 유튜버 등록 폼 ─── */}
       <section style={{ marginBottom: 28, padding: '16px 20px', backgroundColor: '#1e1e1e', borderRadius: 10, border: '1px solid #333' }}>
